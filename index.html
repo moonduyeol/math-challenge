@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="ko" data-appmode="admin">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수학 모의고사 챌린지</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.9/dist/web/static/pretendard.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root{
+  --navy:#16305C; --navy-2:#1E3F7A; --navy-ink:#0E2145;
+  --gold:#E3A008; --gold-soft:#FBEFCF; --gold-ink:#7A5502;
+  --pass:#237A4B; --pass-soft:#E4F3EA;
+  --fail:#C23B3B; --fail-soft:#FBE7E7;
+  --revive:#7A4FCF; --revive-soft:#EEE8FB;
+  --ink:#14202E; --muted:#5C6B7C; --faint:#8A97A6;
+  --paper:#F5F7FB; --card:#FFFFFF; --line:#E1E7F0; --line-2:#CBD5E4;
+  --radius:12px;
+  --font:'Pretendard',system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:var(--font);background:var(--paper);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{margin:0;font-weight:700;letter-spacing:-.01em}
+button{font-family:inherit;cursor:pointer}
+input,select{font-family:inherit;font-size:15px}
+.wrap{max-width:960px;margin:0 auto;padding:0 16px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* top bar */
+.topbar{background:var(--navy);color:#fff}
+.topbar .wrap{display:flex;align-items:center;gap:12px;height:60px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.02em}
+.brand .mark{width:30px;height:30px;border-radius:8px;background:var(--gold);color:var(--navy-ink);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900}
+.brand small{display:block;font-size:11px;font-weight:600;color:#B9C6DE;letter-spacing:.02em;margin-top:-2px}
+.spacer{flex:1}
+.rolepill{font-size:12px;font-weight:700;background:rgba(255,255,255,.14);padding:5px 11px;border-radius:20px;color:#DCE6F6}
+.linkbtn{background:none;border:1px solid rgba(255,255,255,.28);color:#fff;font-size:13px;font-weight:600;padding:6px 12px;border-radius:8px}
+.linkbtn:hover{background:rgba(255,255,255,.1)}
+
+/* admin tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:20px 0 24px;overflow-x:auto}
+.tab{background:none;border:none;padding:11px 14px;font-size:14.5px;font-weight:600;color:var(--muted);border-bottom:2.5px solid transparent;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--navy);border-bottom-color:var(--gold)}
+.panel{display:none;padding-bottom:60px}
+.panel.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+.card + .card{margin-top:16px}
+.card h3{font-size:16px;margin-bottom:4px}
+.card .hint{font-size:13px;color:var(--muted);margin:0 0 14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}}
+
+.btn{background:var(--navy);color:#fff;border:none;padding:10px 18px;border-radius:9px;font-size:14.5px;font-weight:700}
+.btn:hover{background:var(--navy-2)}
+.btn.gold{background:var(--gold);color:var(--navy-ink)}
+.btn.gold:hover{background:#c98c06}
+.btn.ghost{background:#fff;color:var(--navy);border:1px solid var(--line-2)}
+.btn.ghost:hover{background:var(--paper)}
+.btn.sm{padding:7px 13px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.drop{border:2px dashed var(--line-2);border-radius:var(--radius);padding:26px;text-align:center;color:var(--muted);background:var(--paper);transition:.15s}
+.drop.hot{border-color:var(--gold);background:var(--gold-soft);color:var(--gold-ink)}
+.drop b{color:var(--navy);font-weight:700}
+.filein{display:none}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line)}
+th{font-size:12px;font-weight:700;color:var(--muted);background:var(--paper);position:sticky;top:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.tablewrap{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.tag{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:20px}
+.tag.pass{background:var(--pass-soft);color:var(--pass)}
+.tag.fail{background:var(--fail-soft);color:var(--fail)}
+.tag.miss{background:#EEF1F5;color:var(--faint)}
+.tag.revive{background:var(--revive-soft);color:var(--revive)}
+.tag.wait{background:#EAF0FB;color:var(--navy-2)}
+.tag.out{background:#F0F1F3;color:#A9B2BC}
+
+.rrow{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.rrow:last-child{border-bottom:none}
+.rround{font-weight:800;color:var(--navy);font-size:15px}
+.rdate{font-size:12px;color:var(--muted)}
+.rrule{display:flex;align-items:center;gap:8px}
+.rrule select,.rrule input{border:1px solid var(--line-2);border-radius:8px;padding:6px 8px}
+.rrule input[type=number]{width:66px}
+.upstate{font-size:12px;font-weight:700}
+.upstate.done{color:var(--pass)}
+.upstate.none{color:var(--faint)}
+
+.stat{background:var(--paper);border-radius:10px;padding:14px 16px}
+.stat .k{font-size:12.5px;color:var(--muted)}
+.stat .v{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+.statrow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:640px){.statrow{grid-template-columns:repeat(2,1fr)}}
+
+.notice{background:var(--gold-soft);border:1px solid #EFD79A;color:var(--gold-ink);border-radius:10px;padding:12px 14px;font-size:13.5px}
+.notice.info{background:#EAF0FB;border-color:#CBDBF3;color:var(--navy-2)}
+
+/* ===== student ===== */
+.hero{background:var(--navy);color:#fff;padding:30px 0 26px}
+.hero .eyebrow{font-size:12.5px;font-weight:700;color:var(--gold);letter-spacing:.06em}
+.hero h1{font-size:26px;margin:6px 0 2px}
+.hero p{margin:0;color:#C3CFE4;font-size:14px}
+.lookup{background:#fff;border-radius:14px;padding:20px;margin-top:20px;box-shadow:0 8px 24px rgba(14,33,69,.12)}
+.lookup .row{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:10px;margin-bottom:12px}
+@media(max-width:520px){.lookup .row{grid-template-columns:1fr 1fr}}
+.field label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px}
+.field input,.field select{width:100%;padding:11px 12px;border:1px solid var(--line-2);border-radius:9px;color:var(--ink)}
+.field input:focus,.field select:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px rgba(30,63,122,.12)}
+.err{color:var(--fail);font-size:13px;margin-top:8px;font-weight:600}
+
+.dash{padding:22px 0 70px}
+.idcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:14px}
+.idcard .av{width:52px;height:52px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800}
+.idcard .nm{font-size:18px;font-weight:800}
+.idcard .sub{font-size:13px;color:var(--muted);margin-top:1px}
+.survbadge{margin-left:auto;text-align:center}
+.survbadge .b{font-size:14px;font-weight:800;padding:8px 16px;border-radius:24px;display:inline-flex;align-items:center;gap:6px}
+.survbadge .b.alive{background:var(--gold-soft);color:var(--gold-ink);border:1.5px solid var(--gold)}
+.survbadge .b.dead{background:var(--fail-soft);color:var(--fail)}
+
+.mcards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+@media(max-width:640px){.mcards{grid-template-columns:repeat(2,1fr)}}
+.mc{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.mc .k{font-size:12.5px;color:var(--muted)}
+.mc .v{font-size:24px;font-weight:800;margin-top:3px;letter-spacing:-.02em}
+.mc .v small{font-size:13px;color:var(--faint);font-weight:600}
+.up{color:var(--pass)} .down{color:var(--fail)}
+
+.section{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-top:14px}
+.section h3{font-size:15px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.section h3 span{font-size:12.5px;font-weight:600;color:var(--muted)}
+
+/* track */
+.track{display:flex;gap:6px}
+.tstop{flex:1;text-align:center;border-radius:8px;padding:9px 2px;font-size:11px;font-weight:700;line-height:1.35}
+.tstop .d{font-size:10.5px;font-weight:600;opacity:.85}
+.tstop.pass{background:var(--pass-soft);color:var(--pass)}
+.tstop.fail{background:var(--fail-soft);color:var(--fail)}
+.tstop.miss{background:#EEF1F5;color:var(--faint)}
+.tstop.revive{background:var(--revive-soft);color:var(--revive)}
+.tstop.wait{background:#EFF3FA;color:var(--navy-2)}
+.tstop.out{background:#F2F3F5;color:#B4BCC5}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:11.5px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+
+.roundlist{display:flex;flex-direction:column;gap:8px}
+.matline{margin-top:7px;display:flex;flex-wrap:wrap;gap:6px}
+.matbtn{padding:4px 10px;font-size:12px}
+.matchip{display:inline-flex;align-items:center;gap:5px;font-size:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:4px 8px}
+.matchip i{color:var(--faint);font-style:normal;font-size:11px}
+.matchip button{background:none;border:none;font-size:12px;padding:1px 3px;color:var(--navy)}
+.matchip button:hover{color:var(--fail)}
+.matrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.matrow:last-child{border-bottom:none}
+.pwform{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px}
+@media(max-width:640px){.pwform{grid-template-columns:1fr}}
+.pwform input{padding:9px 11px;border:1px solid var(--line-2);border-radius:8px}
+.oxdetail{border:1px solid var(--line);border-top:none;border-radius:0 0 10px 10px;margin-top:-8px;padding:14px;background:var(--paper)}
+.oxgrid{display:grid;grid-template-columns:repeat(10,1fr);gap:5px}
+@media(max-width:480px){.oxgrid{grid-template-columns:repeat(6,1fr)}}
+.oxcell{border-radius:6px;text-align:center;font-size:10.5px;font-weight:700;padding:5px 0 3px;line-height:1.2}
+.oxcell span{display:block;font-size:12px}
+.oxcell.o{background:var(--pass-soft);color:var(--pass)}
+.oxcell.x{background:var(--fail-soft);color:var(--fail)}
+.rd{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.rd .rl{font-weight:800;color:var(--navy);font-size:14px}
+.rd .rl small{display:block;font-size:11px;color:var(--muted);font-weight:600}
+.rd .mid{font-size:13px;color:var(--muted)}
+.rd .mid b{color:var(--ink);font-weight:700}
+.rd .sc{font-size:20px;font-weight:800;text-align:right}
+.rd .sc small{font-size:12px;color:var(--faint);font-weight:600}
+
+.trend{width:100%;height:130px}
+footer{border-top:1px solid var(--line);padding:20px 0 40px;color:var(--faint);font-size:12.5px;text-align:center}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<script id="embedded-data" type="application/json">null</script>
+
+<div class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="mark">챌</span><div>수학 모의고사 챌린지<small>지금의 노력, 수능의 결과를 바꿉니다</small></div></div>
+    <div class="spacer"></div>
+    <span class="rolepill" id="rolePill">관리자</span>
+    <button class="linkbtn hidden" id="toAdmin">관리자 모드</button>
+  </div>
+</div>
+
+<main class="wrap" id="app"></main>
+
+<footer id="foot"></footer>
+
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const ce=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const round=(n)=>Math.round(n);
+const pad2=(n)=>String(n).padStart(2,'0');
+const hakbeon=(ban,beon)=>`3${pad2(ban)}${pad2(beon)}`;
+/* password (soft protection, per-device) */
+function pwHash(str){let h1=0xdeadbeef,h2=0x41c6ce57;for(let i=0;i<str.length;i++){const ch=str.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677);}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return(4294967296*(2097151&h2)+(h1>>>0)).toString(36);}
+function getPwRecord(h){try{const v=localStorage.getItem('chpw_'+h);return v?JSON.parse(v):null;}catch(e){return null;}}
+function setPwRecord(h,pw){try{localStorage.setItem('chpw_'+h,JSON.stringify({h:pwHash(pw),ts:Date.now()}));}catch(e){}}
+function effectivePwHash(r){let rec=getPwRecord(r.hakbeon);
+  if(rec&&r.pwResetAt&&rec.ts<r.pwResetAt){try{localStorage.removeItem('chpw_'+r.hakbeon);}catch(e){}rec=null;}
+  return rec?rec.h:pwHash('1234');}
+/* IndexedDB for round materials (problem/solution files) - admin side */
+const FDB={db:null,
+  open(){return new Promise(res=>{try{if(!window.indexedDB)return res(null);
+    const rq=indexedDB.open('challenge_files_v1',1);
+    rq.onupgradeneeded=()=>{rq.result.createObjectStore('f');};
+    rq.onsuccess=()=>{FDB.db=rq.result;res(FDB.db);};
+    rq.onerror=()=>res(null);}catch(e){res(null);}});},
+  put(k,v){return new Promise(res=>{if(!FDB.db)return res(false);
+    const tx=FDB.db.transaction('f','readwrite');tx.objectStore('f').put(v,k);
+    tx.oncomplete=()=>res(true);tx.onerror=()=>res(false);});},
+  del(k){return new Promise(res=>{if(!FDB.db)return res(false);
+    const tx=FDB.db.transaction('f','readwrite');tx.objectStore('f').delete(k);
+    tx.oncomplete=()=>res(true);tx.onerror=()=>res(false);});},
+  all(){return new Promise(res=>{if(!FDB.db)return res({});
+    const out={};const tx=FDB.db.transaction('f','readonly');
+    const rq=tx.objectStore('f').openCursor();
+    rq.onsuccess=()=>{const c=rq.result;if(c){out[c.key]=c.value;c.continue();}else res(out);};
+    rq.onerror=()=>res({});});}
+};
+const fmtBytes=(n)=>n>1048576?(n/1048576).toFixed(1)+'MB':Math.ceil(n/1024)+'KB';
+const subjNorm=(s)=>{if(!s)return'';s=String(s).replace(/\s/g,'');if(s.includes('미적'))return'미적분';if(s.includes('확률')||s.includes('확통'))return'확률과통계';if(s.includes('기하'))return'기하';return s;};
+
+/* ---- rounds definition (poster) ---- */
+function defaultRounds(){
+  const R=(idx,date,label,rule,extra={})=>({idx,date,label,rule,...extra});
+  return [
+    R(1,'7/24','7월 1차',{type:'abs',pass:48}),
+    R(2,'7/29','7월 2차',{type:'abs',pass:48}),
+    R(3,'8/8','8월 1차',{type:'rel',pct:80}),
+    R(4,'8/15','8월 2차',{type:'rel',pct:80}),
+    R(5,'8/22','8월 3차',{type:'rel',pct:80}),
+    R(6,'8/29','8월 4차',{type:'rel',pct:80}),
+    R(7,'9/12','9월 1차',{type:'rel',pct:70},{revivePct:30}),
+    R(8,'9/19','9월 2차',{type:'rel',pct:70}),
+    R(9,'10/3','10월 1차',{type:'rel',pct:70,alpha:true}),
+    R(10,'10/10','10월 2차',{type:'rel',pct:70,alpha:true}),
+  ];
+}
+
+/* ---- state ---- */
+let S=null;
+function blankState(){return{roster:[],rounds:defaultRounds(),scores:{},keys:{},files:{},options:{missCounts:true},mode:'admin'};}
+function loadState(){
+  const emb=JSON.parse($('#embedded-data').textContent||'null');
+  if(emb&&emb.roster){S=emb;S.files=emb.files||{};S.mode='student';return;}
+  try{const ls=localStorage.getItem('challenge_state_v1');if(ls){S=JSON.parse(ls);S.rounds=S.rounds||defaultRounds();S.scores=S.scores||{};S.keys=S.keys||{};S.files={};S.options=S.options||{missCounts:true};return;}}catch(e){}
+  S=blankState();
+}
+function saveState(){if(S.mode==='student')return;try{localStorage.setItem('challenge_state_v1',JSON.stringify({roster:S.roster,rounds:S.rounds,scores:S.scores,keys:S.keys,options:S.options}));}catch(e){}}
+
+/* ================= SURVIVAL ENGINE ================= */
+function compute(){
+  const roster=S.roster, rounds=S.rounds, scores=S.scores;
+  const alive=new Set(roster.map(r=>r.hakbeon));
+  const outAt={};                 // hakbeon -> round idx eliminated
+  const status={};                // hakbeon -> {roundIdx: '통과'|'탈락'|'미응시'|'부활'|'대기'|'해당없음'}
+  roster.forEach(r=>status[r.hakbeon]={});
+  const roundStats={};            // idx -> {takers,cut,uploaded}
+
+  for(const rd of rounds){
+    const data=scores[rd.idx];    // {hakbeon:{score,gong,sel}}
+    const uploaded=!!data;
+    roundStats[rd.idx]={uploaded};
+    if(!uploaded){ roster.forEach(r=>{ status[r.hakbeon][rd.idx]= (alive.has(r.hakbeon)?'대기':'해당없음'); }); continue; }
+
+    const takers=[...alive].filter(h=>data[h]!=null).map(h=>({h,score:data[h].score}));
+    const absent=[...alive].filter(h=>data[h]==null);
+    roundStats[rd.idx].takers=takers.length;
+
+    // pass set
+    let passSet=new Set(), cutScore=null;
+    if(rd.rule.type==='abs'){
+      const thr=rd.rule.pass; cutScore=thr;
+      takers.forEach(t=>{if(t.score>=thr)passSet.add(t.h);});
+    }else{
+      const N=takers.length;
+      const sorted=[...takers].sort((a,b)=>b.score-a.score);
+      const passCount=Math.max(0,Math.ceil(N*(rd.rule.pct/100)));
+      if(passCount>=N){sorted.forEach(t=>passSet.add(t.h));cutScore=sorted.length?sorted[sorted.length-1].score:null;}
+      else if(passCount<=0){cutScore=Infinity;}
+      else{cutScore=sorted[passCount-1].score; sorted.forEach(t=>{if(t.score>=cutScore)passSet.add(t.h);});} // tie-inclusive
+    }
+    roundStats[rd.idx].cut=cutScore;
+
+    // provisional statuses for this round's participants
+    const failedTakers=[];
+    takers.forEach(t=>{
+      if(passSet.has(t.h)) status[t.h][rd.idx]='통과';
+      else {status[t.h][rd.idx]='탈락'; failedTakers.push(t);}
+    });
+    absent.forEach(h=>{status[h][rd.idx]='미응시';});
+
+    // revive (poster: 9/12 탈락자 중 상위 30% 부활)
+    let revived=new Set();
+    if(rd.revivePct){
+      const pool=[...failedTakers].sort((a,b)=>b.score-a.score);
+      const rc=Math.round(pool.length*(rd.revivePct/100));
+      for(let i=0;i<rc;i++){revived.add(pool[i].h);status[pool[i].h][rd.idx]='부활';}
+    }
+
+    // eliminate: failed takers (not revived) + absent (missCounts)
+    const drop=[];
+    failedTakers.forEach(t=>{if(!revived.has(t.h))drop.push(t.h);});
+    if(S.options.missCounts) absent.forEach(h=>drop.push(h));
+    drop.forEach(h=>{alive.delete(h);outAt[h]=rd.idx;});
+
+    // mark students already eliminated in earlier rounds
+    roster.forEach(r=>{ if(!alive.has(r.hakbeon)&&outAt[r.hakbeon]<rd.idx && status[r.hakbeon][rd.idx]==null) status[r.hakbeon][rd.idx]='해당없음'; });
+  }
+  // fill any gaps
+  roster.forEach(r=>{rounds.forEach(rd=>{if(status[r.hakbeon][rd.idx]==null)status[r.hakbeon][rd.idx]='해당없음';});});
+
+  // per-student rollups
+  const per={};
+  roster.forEach(r=>{
+    const h=r.hakbeon; const taken=[];
+    rounds.forEach(rd=>{const d=scores[rd.idx];if(d&&d[h]!=null)taken.push({idx:rd.idx,date:rd.date,label:rd.label,score:d[h].score,gong:d[h].gong,sel:d[h].sel,obj:d[h].obj,sbj:d[h].sbj,ox:d[h].ox,ju:d[h].ju});});
+    // rank within each taken round (among that round's takers, subject-agnostic + within subject)
+    taken.forEach(t=>{
+      const d=scores[t.idx];
+      const all=Object.keys(d).map(k=>({h:k,score:d[k].score}));
+      const alSort=[...all].sort((a,b)=>b.score-a.score);
+      t.rank=alSort.findIndex(x=>x.h===h)+1; t.N=all.length;
+      t.pct=t.N?Math.round((1-(t.rank-1)/t.N)*100):null;
+      const sameSubj=all.filter(x=>{const rr=roster.find(y=>y.hakbeon===x.h);return rr&&rr.subject===r.subject;}).sort((a,b)=>b.score-a.score);
+      t.srank=sameSubj.findIndex(x=>x.h===h)+1; t.sN=sameSubj.length;
+    });
+    const first=taken[0], last=taken[taken.length-1];
+    per[h]={
+      taken, count:taken.length,
+      alive:alive.has(h), outAt:outAt[h]||null,
+      firstScore:first?first.score:null, lastScore:last?last.score:null,
+      improve:(first&&last)?last.score-first.score:null,
+      rankChange:(first&&last&&first.rank&&last.rank)?first.rank-last.rank:null,
+      status:status[h]
+    };
+  });
+  return {alive,per,roundStats,outAt,status};
+}
+
+/* ================= EXCEL / CSV PARSING ================= */
+/* ---- 개인채점표 parser (문항별 O/X 포함) ---- */
+function parseGradingSheet(rows){
+  let hr=-1;
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    const H=(rows[i]||[]).map(x=>x==null?'':String(x).replace(/\s/g,''));
+    if(H.includes('현황')&&H.includes('총점')&&H.some(c=>/^\d+~\d+$/.test(c))){hr=i;break;}
+  }
+  if(hr<0)return null;
+  const H=rows[hr].map(x=>x==null?'':String(x).replace(/\s/g,''));
+  const col=(k)=>H.findIndex(c=>c===k);
+  const cBan=H.findIndex(c=>c.includes('반')&&!c.includes('반영'));
+  const cBeon=H.findIndex(c=>c.includes('번호'));
+  const cName=H.findIndex(c=>c.includes('이름'));
+  const cStat=col('현황');
+  const cSubj=H.findIndex(c=>c.includes('선택과목')||c==='과목');
+  const cObj=col('객관식'), cSbj=col('주관식'), cTot=col('총점');
+  const blocks=[];H.forEach((c,i)=>{const m=c.match(/^(\d+)~(\d+)$/);if(m)blocks.push({col:i,from:+m[1],to:+m[2]});});
+  blocks.sort((a,b)=>a.from-b.from);
+  const juCols=[];H.forEach((c,i)=>{const m=c.match(/^주(\d+)$/);if(m)juCols.push({col:i,n:+m[1]});});
+  juCols.sort((a,b)=>a.n-b.n);
+  if(cName<0||cTot<0||!blocks.length)return null;
+  const keys={};const students=[];
+  for(let i=hr+1;i<rows.length;i++){
+    const r=rows[i]||[];if(!r.length)continue;
+    const subjName=subjNorm(r[cBan]);
+    if(typeof r[cBan]==='string'&&['미적분','확률과통계','기하'].includes(subjName)){
+      keys[subjName]={blocks:blocks.map(b=>r[b.col]==null?'':String(r[b.col])),
+                      ju:juCols.map(j=>r[j.col]==null?null:r[j.col])};
+      continue;
+    }
+    const ban=parseInt(r[cBan]),beon=parseInt(r[cBeon]);
+    const name=r[cName]==null?'':String(r[cName]).trim();
+    if(isNaN(ban)||isNaN(beon)||!name.match(/[가-힣A-Za-z]/))continue;
+    const stat=r[cStat]==null?'':String(r[cStat]).replace(/\s/g,'');
+    const tot=r[cTot];
+    if(stat.includes('미응시')||tot==null||tot==='')continue;
+    students.push({ban,beon,name,subject:subjNorm(cSubj>=0?r[cSubj]:''),
+      score:Number(tot),
+      obj:cObj>=0&&r[cObj]!=null?Number(r[cObj]):null,
+      sbj:cSbj>=0&&r[cSbj]!=null?Number(r[cSbj]):null,
+      ox:blocks.map(b=>r[b.col]==null?'':String(r[b.col])).join(''),
+      ju:juCols.map(j=>r[j.col]==null?null:r[j.col])});
+  }
+  if(!students.length)return null;
+  return {students,keys,meta:{qFrom:blocks[0].from,qTo:blocks[blocks.length-1].to}};
+}
+
+// find math score table in a workbook: returns {sheet,data:[{ban,beon,name,subject,score,gong,sel}],conf}
+function parseScoreWorkbook(wb){
+  let best=null;
+  for(const sn of wb.SheetNames){
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:null,blankrows:false});
+    const gs=parseGradingSheet(rows);
+    if(gs){
+      const cand={sheet:sn,grading:gs,data:gs.students,conf:3};
+      if(!best||cand.conf>best.conf||(cand.conf===best.conf&&cand.data.length>best.data.length))best=cand;
+      continue;
+    }
+    const res=extractScores(rows);
+    if(res&&res.data.length){
+      const cand={sheet:sn,data:res.data,conf:res.conf};
+      if(!best||cand.conf>best.conf||(cand.conf===best.conf&&cand.data.length>best.data.length))best=cand;
+    }
+  }
+  return best;
+}
+function findHeaderRow(rows){
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const r=(rows[i]||[]).map(x=>x==null?'':String(x).replace(/\s/g,''));
+    if(r.some(c=>c.includes('이름'))){
+      if(r.some(c=>c.includes('반'))&&r.some(c=>c.includes('번호'))) return i;
+    }
+  }
+  return -1;
+}
+function extractScores(rows){
+  const hr=findHeaderRow(rows); if(hr<0)return null;
+  const H=rows[hr].map(x=>x==null?'':String(x).replace(/\s/g,''));
+  const eq=(k)=>H.findIndex(c=>c===k);
+  const inc=(pred)=>H.findIndex(c=>pred(c));
+  const bad=(c)=>/국어|국수영탐|영어|탐구|총점|등급|석차|백분위|평균|한국사/.test(c);
+  const cBan=eq('반')>=0?eq('반'):inc(c=>c.includes('반')&&!c.includes('반영'));
+  const cBeon=inc(c=>c.includes('번호'));
+  const cName=inc(c=>c.includes('이름'));
+  // math-specific score column first (highest confidence)
+  let cScore=inc(c=>c.includes('수학')&&(c.includes('원점수')||c.includes('점수')||c.includes('합산')));
+  let conf=cScore>=0?2:0;
+  if(cScore<0)cScore=inc(c=>c.includes('합산점수')&&!bad(c));
+  if(cScore<0)cScore=inc(c=>(c==='점수'||c==='원점수')&&!bad(c));
+  if(cScore>=0&&conf===0)conf=1;
+  let cSubj=inc(c=>c.includes('수학')&&(c.includes('유형')||c.includes('선택')||c.includes('과목')));
+  if(cSubj<0)cSubj=inc(c=>c.includes('선택과목')||c==='과목');
+  let cGong=inc(c=>c.includes('수학')&&c.includes('공통'));if(cGong<0)cGong=inc(c=>c==='공통점수');
+  let cSel=inc(c=>c.includes('수학')&&c.includes('선택')&&c.includes('점수'));if(cSel<0)cSel=inc(c=>c==='선택점수');
+  if(cName<0||cScore<0)return null;
+  const out=[];
+  for(let i=hr+1;i<rows.length;i++){
+    const r=rows[i]||[]; if(!r.length)continue;
+    let name=r[cName], ban=r[cBan], beon=r[cBeon];
+    // handle 1-col offset when 학번 occupies col0 and header names are shifted +1
+    const shift=(name==null||String(name).match(/^\d+$/))&&r[cName-1]!=null&&String(r[cName-1]).match(/[가-힣]/);
+    const g=(idx)=>idx<0?null:r[shift?idx-1:idx];
+    if(shift){name=r[cName-1];ban=r[cBan-1];beon=r[cBeon-1];}
+    let sc=g(cScore), sj=g(cSubj), gg=g(cGong), sl=g(cSel);
+    if(name==null||!String(name).match(/[가-힣A-Za-z]/))continue;
+    ban=parseInt(ban); beon=parseInt(beon); sc=(sc==null||sc==='')?null:Number(sc);
+    if(isNaN(ban)||isNaN(beon))continue;
+    out.push({ban,beon,name:String(name).trim(),subject:subjNorm(sj),
+      score:(sc==null||isNaN(sc))?null:sc,
+      gong:(gg==null||gg===''||isNaN(Number(gg)))?null:Number(gg),
+      sel:(sl==null||sl===''||isNaN(Number(sl)))?null:Number(sl)});
+  }
+  return {data:out.filter(o=>o.score!=null),conf};
+}
+// roster CSV (Google Form): map columns
+function parseRosterCSV(text){
+  const p=Papa.parse(text.trim(),{header:true,skipEmptyLines:true});
+  const rows=p.data; if(!rows.length)return[];
+  const keys=Object.keys(rows[0]);
+  const kf=(...cand)=>{for(const c of cand){const k=keys.find(x=>x.replace(/\s/g,'').includes(c));if(k)return k;}return null;};
+  const kBan=kf('반'), kBeon=kf('번호'), kName=kf('이름'), kSubj=kf('선택과목','과목','수학'), kNick=kf('별명','닉네임','활동');
+  const out=[];const seen=new Set();
+  rows.forEach(r=>{
+    const ban=parseInt(r[kBan]), beon=parseInt(r[kBeon]), name=(r[kName]||'').trim();
+    if(isNaN(ban)||isNaN(beon)||!name)return;
+    const h=hakbeon(ban,beon); if(seen.has(h))return; seen.add(h);
+    out.push({hakbeon:h,ban,beon,name,subject:subjNorm(kSubj?r[kSubj]:''),nickname:kNick?(r[kNick]||'').trim():''});
+  });
+  return out;
+}
+
+/* ================= ADMIN UI ================= */
+function renderAdmin(){
+  $('#rolePill').textContent='관리자';
+  $('#toAdmin').classList.add('hidden');
+  const app=$('#app');
+  app.innerHTML=`
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-p="p-roster" aria-selected="true">1. 참가자 명단</button>
+    <button class="tab" role="tab" data-p="p-scores" aria-selected="false">2. 회차 성적 업로드</button>
+    <button class="tab" role="tab" data-p="p-rules" aria-selected="false">3. 통과 기준</button>
+    <button class="tab" role="tab" data-p="p-result" aria-selected="false">4. 현황 · 시상</button>
+    <button class="tab" role="tab" data-p="p-export" aria-selected="false">5. 학생용 배포</button>
+  </div>
+  <section id="p-roster" class="panel active"></section>
+  <section id="p-scores" class="panel"></section>
+  <section id="p-rules" class="panel"></section>
+  <section id="p-result" class="panel"></section>
+  <section id="p-export" class="panel"></section>`;
+  $$('.tab').forEach(t=>t.onclick=()=>{
+    $$('.tab').forEach(x=>x.setAttribute('aria-selected','false'));
+    t.setAttribute('aria-selected','true');
+    $$('.panel').forEach(p=>p.classList.remove('active'));
+    $('#'+t.dataset.p).classList.add('active');
+  });
+  renderRoster(); renderScores(); renderRules(); renderResult(); renderExport();
+}
+
+function renderRoster(){
+  const p=$('#p-roster');
+  p.innerHTML=`
+  <div class="card">
+    <h3>구글폼 신청 명단 불러오기</h3>
+    <p class="hint">구글폼 응답을 CSV로 내려받아 여기에 올리면 자동으로 참가자 명단이 만들어집니다. (반·번호·이름·선택과목·별명 열을 자동 인식)</p>
+    <div class="drop" id="rosterDrop"><b>CSV 파일을 끌어다 놓거나 클릭</b><br><span style="font-size:13px">또는 정오표 엑셀(원점수 시트)을 올려 전교생 명단을 바로 생성할 수도 있습니다</span></div>
+    <input type="file" class="filein" id="rosterFile" accept=".csv,.xlsx,.xlsm">
+    <div class="notice info" style="margin-top:14px">구글폼 문항 구성: <b>반</b>(드롭다운 1~n) · <b>번호</b> · <b>이름</b> · <b>수학 선택과목</b>(미적분/확률과통계/기하) · <b>활동 별명</b>(선택)</div>
+  </div>
+  <div class="card" id="rosterView"></div>`;
+  const drop=$('#rosterDrop'), file=$('#rosterFile');
+  drop.onclick=()=>file.click();
+  ['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('hot');}));
+  ['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('hot');}));
+  drop.addEventListener('drop',ev=>handleRosterFile(ev.dataTransfer.files[0]));
+  file.onchange=()=>handleRosterFile(file.files[0]);
+  drawRosterView();
+}
+function handleRosterFile(f){
+  if(!f)return;
+  const ext=f.name.split('.').pop().toLowerCase();
+  const rd=new FileReader();
+  if(ext==='csv'){rd.onload=()=>{const list=parseRosterCSV(rd.result);applyRoster(list);};rd.readAsText(f,'utf-8');}
+  else{rd.onload=()=>{const wb=XLSX.read(rd.result,{type:'array'});const r=parseScoreWorkbook(wb);
+    if(!r){alert('명단을 찾지 못했습니다. 반·번호·이름 열이 있는 시트인지 확인하세요.');return;}
+    const list=r.data.map(d=>({hakbeon:hakbeon(d.ban,d.beon),ban:d.ban,beon:d.beon,name:d.name,subject:d.subject,nickname:''}));
+    const seen=new Set();const dedup=list.filter(x=>seen.has(x.hakbeon)?false:seen.add(x.hakbeon));
+    applyRoster(dedup);};rd.readAsArrayBuffer(f);}
+}
+function applyRoster(list){
+  if(!list.length){alert('불러온 참가자가 없습니다.');return;}
+  S.roster=list; saveState(); drawRosterView(); renderResult(); renderExport();
+  alert(list.length+'명의 참가자를 불러왔습니다.');
+}
+function drawRosterView(){
+  const v=$('#rosterView'); if(!v)return;
+  if(!S.roster.length){v.innerHTML='<p class="hint" style="margin:0">아직 불러온 참가자가 없습니다.</p>';return;}
+  const byS={미적분:0,확률과통계:0,기하:0};S.roster.forEach(r=>{if(byS[r.subject]!=null)byS[r.subject]++;});
+  v.innerHTML=`<h3>참가자 ${S.roster.length}명</h3>
+    <div class="statrow" style="margin:12px 0 16px">
+      <div class="stat"><div class="k">전체</div><div class="v">${S.roster.length}</div></div>
+      <div class="stat"><div class="k">미적분</div><div class="v">${byS.미적분}</div></div>
+      <div class="stat"><div class="k">확률과통계</div><div class="v">${byS.확률과통계}</div></div>
+      <div class="stat"><div class="k">기하</div><div class="v">${byS.기하}</div></div>
+    </div>
+    <div class="tablewrap"><table><thead><tr><th>반</th><th class="num">번호</th><th>이름</th><th>선택과목</th><th>별명</th><th>비밀번호</th></tr></thead><tbody>
+    ${S.roster.map((r,i)=>`<tr><td>${r.ban}</td><td class="num">${r.beon}</td><td>${r.name}</td><td>${r.subject||'-'}</td><td>${r.nickname||'-'}</td><td><button class="btn ghost sm" data-pwreset="${i}" style="padding:3px 9px;font-size:11.5px">초기화</button>${r.pwResetAt?`<span class="rdate" style="margin-left:5px">${new Date(r.pwResetAt).toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'})} 초기화</span>`:''}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  v.querySelectorAll('[data-pwreset]').forEach(b=>b.onclick=()=>{
+    const r=S.roster[+b.dataset.pwreset];
+    if(!confirm(`${r.ban}반 ${r.beon}번 ${r.name} 학생의 비밀번호를 초기값(1234)으로 되돌릴까요?\n\n※ 5번 탭에서 학생용 파일을 다시 내보내 배포해야 적용됩니다.`))return;
+    r.pwResetAt=Date.now();saveState();drawRosterView();
+  });
+}
+
+function renderScores(){
+  const p=$('#p-scores');
+  p.innerHTML=`
+  <div class="card">
+    <h3>회차별 개인채점표 업로드</h3>
+    <p class="hint">각 시험이 끝나면 해당 회차에 개인채점표 엑셀(.xls/.xlsx)을 올리세요. 문항별 O/X, 객관식·주관식 점수, 총점, 정답 키까지 자동으로 읽어 정오표·석차·생존을 계산합니다. 미응시 학생은 자동 제외됩니다.</p>
+    <button class="btn ghost sm" id="tplBtn" style="margin-bottom:16px">📄 샘플 양식 다운로드 (.xlsx)</button>
+    <div id="roundUploads"></div>
+  </div>`;
+  $('#tplBtn').onclick=downloadTemplate;
+  const box=$('#roundUploads');
+  S.rounds.forEach(rd=>{
+    const has=!!S.scores[rd.idx];
+    const cnt=has?Object.keys(S.scores[rd.idx]).length:0;
+    const hasOX=has&&Object.values(S.scores[rd.idx]).some(v=>v.ox);
+    const row=ce('div','rrow');
+    row.innerHTML=`
+      <div><div class="rround">${rd.idx}회</div></div>
+      <div><b>${rd.label}</b> <span class="rdate">· ${rd.date}</span><br>
+        <span class="upstate ${has?'done':'none'}">${has?`업로드됨 · 응시 ${cnt}명${hasOX?' · 문항별 O/X 포함':''}`:'미업로드'}</span>
+        <div class="matline">${matChip(rd.idx,'problem','문제지')} ${matChip(rd.idx,'solution','해설지')}</div></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn ghost sm" data-up="${rd.idx}">엑셀 올리기</button>
+        ${has?`<button class="btn ghost sm" data-clr="${rd.idx}">삭제</button>`:''}
+      </div>`;
+    box.appendChild(row);
+  });
+  const fi=ce('input','filein');fi.type='file';fi.accept='.xls,.xlsx,.xlsm';fi.id='roundFile';box.appendChild(fi);
+  const mfi=ce('input','filein');mfi.type='file';mfi.accept='.pdf,.hwp,.hwpx,.doc,.docx,.zip,.png,.jpg';box.appendChild(mfi);
+  let target=null, matTarget=null;
+  box.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{target=+b.dataset.up;fi.value='';fi.click();});
+  box.querySelectorAll('[data-matup]').forEach(b=>b.onclick=()=>{matTarget=b.dataset.matup;mfi.value='';mfi.click();});
+  box.querySelectorAll('[data-matdl]').forEach(b=>b.onclick=()=>{downloadMaterial(b.dataset.matdl);});
+  box.querySelectorAll('[data-matdel]').forEach(b=>b.onclick=()=>{const k=b.dataset.matdel;
+    if(!confirm('이 자료를 삭제할까요?'))return;
+    delete S.files[k];FDB.del(k);renderScores();renderExport();});
+  mfi.onchange=()=>{const f=mfi.files[0];if(!f||!matTarget)return;
+    if(f.size>15*1048576){alert('파일이 15MB를 넘습니다. 배포 파일이 너무 커지므로 PDF 압축 후 올려주세요.');return;}
+    const rd=new FileReader();
+    rd.onload=()=>{S.files[matTarget]={name:f.name,type:f.type||'application/octet-stream',size:f.size,data:rd.result};
+      FDB.put(matTarget,S.files[matTarget]);renderScores();renderExport();};
+    rd.readAsDataURL(f);};
+  box.querySelectorAll('[data-clr]').forEach(b=>b.onclick=()=>{if(confirm(b.dataset.clr+'회 성적을 삭제할까요?')){delete S.scores[b.dataset.clr];delete S.keys[b.dataset.clr];saveState();renderScores();renderResult();renderExport();}});
+  fi.onchange=()=>{const f=fi.files[0];if(!f||target==null)return;
+    const rd=new FileReader();rd.onload=()=>{
+      const wb=XLSX.read(rd.result,{type:'array'});const r=parseScoreWorkbook(wb);
+      if(!r){alert('점수 데이터를 찾지 못했습니다. 샘플 양식과 열 구성이 같은지 확인하세요.');return;}
+      const map={};let matched=0,unknown=0;
+      r.data.forEach(d=>{const h=hakbeon(d.ban,d.beon);
+        if(S.roster.length && !S.roster.find(x=>x.hakbeon===h)){unknown++;}
+        map[h]={score:d.score,obj:d.obj??null,sbj:d.sbj??null,gong:d.gong??null,sel:d.sel??null,
+                ox:d.ox||null,ju:d.ju||null,subject:d.subject||''};matched++;});
+      S.scores[target]=map;
+      if(r.grading){S.keys[target]={keys:r.grading.keys,meta:r.grading.meta};}
+      saveState();renderScores();renderResult();renderExport();
+      alert(`${target}회 업로드 완료 · ${matched}명 처리${r.grading?' · 문항별 O/X 인식됨':''}${unknown?` (미신청 ${unknown}명 포함)`:''}`);
+    };rd.readAsArrayBuffer(f);};
+}
+function matChip(idx,kind,label){
+  const k=idx+':'+kind;const f=S.files[k];
+  if(!f)return `<button class="btn ghost sm matbtn" data-matup="${k}">+ ${label}</button>`;
+  return `<span class="matchip"><b>${label}</b> ${f.name.length>18?f.name.slice(0,16)+'…':f.name} <i>(${fmtBytes(f.size||0)})</i>
+    <button data-matdl="${k}" title="다운로드">⬇</button><button data-matdel="${k}" title="삭제">✕</button></span>`;
+}
+function downloadMaterial(k){
+  const f=S.files[k];if(!f)return;
+  const a=document.createElement('a');a.href=f.data;a.download=f.name;a.click();
+}
+function downloadTemplate(){
+  const header=['반','번호','이  름','현 황','1 ~5','6 ~10','11~15','16~20','21~25','26~30','주1','주2','주3','주4','주5','주6','주7','주8','주9','선택과목','객관식','주관식','총점'];
+  const rows=[header,
+    ['확률과통계',null,null,null,'52531','43534','22341','JJJJJ','JJ513','412JJ',5,7,10,14,39,24,117,324,440,null,null,null,null],
+    ['미적분',null,null,null,'52531','43534','22341','JJJJJ','JJ423','115JJ',5,7,10,14,39,24,117,13,6,null,null,null,null],
+    ['기하',null,null,null,'52531','43534','22341','JJJJJ','JJ354','112JJ',5,7,10,14,39,24,117,4,33,null,null,null,null],
+    [1,1,'홍길동','응시','OOXOO','OOOOO','OXOOX','OOOOX','XXOOO','OOXXX',5,7,10,14,13,0,49,2,6,'미적분',53,12,65],
+    [1,2,'김철수','미응시',null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=header.map((h,i)=>({wch:i<4?7:(i>=19?9:8)}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Sheet1');
+  XLSX.writeFile(wb,'개인채점표_샘플양식.xlsx');
+}
+
+function renderRules(){
+  const p=$('#p-rules');
+  p.innerHTML=`
+  <div class="card">
+    <h3>회차별 통과 기준</h3>
+    <p class="hint">포스터 기준이 기본값으로 설정되어 있습니다. 필요 시 회차별로 수정하세요. (절대: n점 이상 통과 / 상대: 응시자 상위 n% 통과)</p>
+    <div id="ruleRows"></div>
+    <div style="margin-top:16px"><label style="font-size:13.5px;font-weight:600"><input type="checkbox" id="missChk" ${S.options.missCounts?'checked':''}> 미응시는 탈락으로 처리</label></div>
+  </div>`;
+  const box=$('#ruleRows');
+  S.rounds.forEach(rd=>{
+    const row=ce('div','rrow');
+    const isAbs=rd.rule.type==='abs';
+    row.innerHTML=`
+      <div><div class="rround">${rd.idx}회</div><div class="rdate">${rd.date}</div></div>
+      <div class="rrule">
+        <select data-t="${rd.idx}">
+          <option value="abs" ${isAbs?'selected':''}>절대 · 점수 이상</option>
+          <option value="rel" ${!isAbs?'selected':''}>상대 · 상위 %</option>
+        </select>
+        <input type="number" data-v="${rd.idx}" value="${isAbs?rd.rule.pass:rd.rule.pct}" min="0" max="${isAbs?100:100}">
+        <span class="rdate">${isAbs?'점 이상':'% 통과'}</span>
+        ${rd.revivePct!=null?`<span class="tag revive">패자부활 상위 <input type="number" data-rev="${rd.idx}" value="${rd.revivePct}" style="width:52px;margin:0 2px" min="0" max="100">%</span>`:''}
+      </div>
+      <div></div>`;
+    box.appendChild(row);
+  });
+  box.querySelectorAll('[data-t]').forEach(sel=>sel.onchange=()=>{const i=+sel.dataset.t;const rd=S.rounds.find(r=>r.idx===i);
+    if(sel.value==='abs'){rd.rule={type:'abs',pass:48};}else{rd.rule={type:'rel',pct:70,...(rd.rule.alpha?{alpha:true}:{})};}saveState();renderRules();renderResult();});
+  box.querySelectorAll('[data-v]').forEach(inp=>inp.onchange=()=>{const i=+inp.dataset.v;const rd=S.rounds.find(r=>r.idx===i);const val=Math.max(0,Number(inp.value)||0);
+    if(rd.rule.type==='abs')rd.rule.pass=val;else rd.rule.pct=val;saveState();renderResult();});
+  box.querySelectorAll('[data-rev]').forEach(inp=>inp.onchange=()=>{const i=+inp.dataset.rev;const rd=S.rounds.find(r=>r.idx===i);rd.revivePct=Math.max(0,Number(inp.value)||0);saveState();renderResult();});
+  $('#missChk').onchange=e=>{S.options.missCounts=e.target.checked;saveState();renderResult();};
+}
+
+function renderResult(){
+  const p=$('#p-result'); if(!p)return;
+  if(!S.roster.length){p.innerHTML='<div class="card"><p class="hint" style="margin:0">먼저 1번 탭에서 참가자 명단을 불러오세요.</p></div>';return;}
+  const c=compute();
+  const aliveCount=[...c.alive].length;
+  const uploaded=S.rounds.filter(r=>S.scores[r.idx]).length;
+  // 시상 후보
+  const finishers=S.roster.filter(r=>c.per[r.hakbeon].count===S.rounds.length); // 전 회차 응시
+  const improvers=[...S.roster].filter(r=>c.per[r.hakbeon].improve!=null)
+    .sort((a,b)=>c.per[b.hakbeon].improve-c.per[a.hakbeon].improve).slice(0,10);
+  p.innerHTML=`
+  <div class="card">
+    <h3>운영 현황</h3>
+    <div class="statrow" style="margin-top:12px">
+      <div class="stat"><div class="k">참가자</div><div class="v">${S.roster.length}</div></div>
+      <div class="stat"><div class="k">현재 생존</div><div class="v" style="color:var(--gold-ink)">${aliveCount}</div></div>
+      <div class="stat"><div class="k">진행 회차</div><div class="v">${uploaded}<small style="font-size:14px;color:var(--faint)">/${S.rounds.length}</small></div></div>
+      <div class="stat"><div class="k">완주(전회차 응시)</div><div class="v">${finishers.length}</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>회차별 생존 추이</h3>
+    <div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>회차</th><th>날짜</th><th class="num">응시</th><th class="num">컷</th><th class="num">생존(누적)</th></tr></thead><tbody id="roundStatBody"></tbody></table></div>
+  </div>
+  <div class="card" id="vizCard">
+    <h3>전체 점수 분포 · 문항 분석</h3>
+    <div style="display:flex;gap:8px;margin:12px 0;flex-wrap:wrap">
+      <select id="vizRound" style="border:1px solid var(--line-2);border-radius:8px;padding:7px 10px"></select>
+      <select id="vizSubj" style="border:1px solid var(--line-2);border-radius:8px;padding:7px 10px">
+        <option value="">전체 과목</option><option>미적분</option><option>확률과통계</option><option>기하</option>
+      </select>
+    </div>
+    <div id="vizBody"></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>성장상 후보 <span class="rdate">(향상도 상위 10)</span></h3>
+      <div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>이름</th><th>과목</th><th class="num">향상</th><th class="num">첫→최근</th></tr></thead><tbody>
+      ${improvers.map(r=>{const pp=c.per[r.hakbeon];return `<tr><td>${r.name}</td><td>${r.subject||'-'}</td><td class="num" style="color:var(--pass);font-weight:700">+${pp.improve}</td><td class="num">${pp.firstScore}→${pp.lastScore}</td></tr>`;}).join('')||'<tr><td colspan="4">데이터 없음</td></tr>'}
+      </tbody></table></div>
+    </div>
+    <div class="card">
+      <h3>완주자 <span class="rdate">(${S.rounds.length}회 전부 응시)</span></h3>
+      <div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>이름</th><th>과목</th><th class="num">생존</th></tr></thead><tbody>
+      ${finishers.map(r=>`<tr><td>${r.name}</td><td>${r.subject||'-'}</td><td class="num">${c.per[r.hakbeon].alive?'<span class=\"tag pass\">생존</span>':'<span class=\"tag out\">탈락</span>'}</td></tr>`).join('')||'<tr><td colspan="3">아직 없음</td></tr>'}
+      </tbody></table></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>참가자별 현황</h3>
+    <div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>반</th><th class="num">번</th><th>이름</th><th>과목</th><th class="num">응시</th><th class="num">향상</th><th>상태</th></tr></thead><tbody id="perBody"></tbody></table></div>
+  </div>`;
+  // round stats
+  let cum=S.roster.length;const rb=$('#roundStatBody');
+  S.rounds.forEach(rd=>{const st=c.roundStats[rd.idx];if(!st.uploaded){return;}
+    // recompute cumulative alive after this round
+  });
+  // compute cumulative alive per round properly
+  const aliveTrace=alivePerRound(c);
+  S.rounds.forEach(rd=>{const st=c.roundStats[rd.idx];const tr=ce('tr');
+    tr.innerHTML=`<td>${rd.idx}회</td><td class="rdate">${rd.date}</td><td class="num">${st.uploaded?st.takers:'-'}</td><td class="num">${st.uploaded&&st.cut!=null&&isFinite(st.cut)?st.cut:'-'}</td><td class="num">${st.uploaded?aliveTrace[rd.idx]:'-'}</td>`;
+    rb.appendChild(tr);});
+  // per body
+  const pb=$('#perBody');
+  S.roster.forEach(r=>{const pp=c.per[r.hakbeon];const tr=ce('tr');
+    const stat=pp.alive?'<span class="tag pass">생존</span>':`<span class="tag fail">${pp.outAt}회 탈락</span>`;
+    tr.innerHTML=`<td>${r.ban}</td><td class="num">${r.beon}</td><td>${r.name}</td><td>${r.subject||'-'}</td><td class="num">${pp.count}</td><td class="num">${pp.improve==null?'-':(pp.improve>0?'+':'')+pp.improve}</td><td>${stat}</td>`;
+    pb.appendChild(tr);});
+  // viz card
+  const upRounds=S.rounds.filter(rd=>S.scores[rd.idx]);
+  if(!upRounds.length){$('#vizCard').innerHTML='<h3>전체 점수 분포 · 문항 분석</h3><p class="hint" style="margin:12px 0 0">회차 성적을 업로드하면 분포와 문항별 정답률이 표시됩니다.</p>';}
+  else{
+    const sel=$('#vizRound');
+    sel.innerHTML=upRounds.map(rd=>`<option value="${rd.idx}">${rd.idx}회 (${rd.date})</option>`).join('');
+    sel.value=upRounds[upRounds.length-1].idx;
+    const redraw=()=>drawViz(+sel.value,$('#vizSubj').value,c);
+    sel.onchange=redraw;$('#vizSubj').onchange=redraw;
+    redraw();
+  }
+}
+function drawViz(roundIdx,subjFilter,c){
+  const body=$('#vizBody');if(!body)return;
+  const data=S.scores[roundIdx]||{};
+  let entries=Object.entries(data).map(([h,v])=>{
+    const r=S.roster.find(x=>x.hakbeon===h);
+    return {h,score:v.score,ox:v.ox,subject:v.subject||(r?r.subject:'')};
+  });
+  if(subjFilter)entries=entries.filter(e=>e.subject===subjFilter);
+  if(!entries.length){body.innerHTML='<p class="hint" style="margin:0">해당 조건의 응시자가 없습니다.</p>';return;}
+  const scores=entries.map(e=>e.score);
+  const avg=scores.reduce((a,b)=>a+b,0)/scores.length;
+  const mx=Math.max(...scores),mn=Math.min(...scores);
+  const rd=S.rounds.find(r=>r.idx===roundIdx);
+  const cut=c.roundStats[roundIdx]&&c.roundStats[roundIdx].cut;
+  // histogram: 10-point bins 0-100
+  const bins=Array(10).fill(0);
+  scores.forEach(s=>{const b=Math.min(9,Math.max(0,Math.floor(s/10)));bins[b]++;});
+  const bmax=Math.max(...bins,1);
+  const W=680,H=170,pad=30,bw=(W-2*pad)/10;
+  let bars='',labels='';
+  bins.forEach((n,i)=>{
+    const bh=(n/bmax)*(H-2*pad-14);
+    const x=pad+i*bw,y=H-pad-bh;
+    const lo=i*10,hi=i*10+9===99?100:i*10+9;
+    const inCut=(cut!=null&&isFinite(cut))?(hi>=cut):true;
+    bars+=`<rect x="${x+3}" y="${y}" width="${bw-6}" height="${Math.max(bh,n?3:0)}" rx="4" fill="${inCut?'var(--navy)':'var(--line-2)'}"/>`;
+    if(n)bars+=`<text x="${x+bw/2}" y="${y-5}" font-size="11" font-weight="700" fill="var(--ink)" text-anchor="middle">${n}</text>`;
+    labels+=`<text x="${x+bw/2}" y="${H-10}" font-size="10" fill="var(--muted)" text-anchor="middle">${lo}${i===9?'~100':''}</text>`;
+  });
+  let cutLine='';
+  if(cut!=null&&isFinite(cut)&&cut>=0&&cut<=100){
+    const cx=pad+(cut/100)*(W-2*pad);
+    cutLine=`<line x1="${cx}" y1="${pad-6}" x2="${cx}" y2="${H-pad}" stroke="var(--fail)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="${cx}" y="${pad-10}" font-size="10.5" font-weight="700" fill="var(--fail)" text-anchor="middle">컷 ${cut}점</text>`;
+  }
+  let html=`
+    <div class="statrow" style="margin-bottom:14px">
+      <div class="stat"><div class="k">응시</div><div class="v">${entries.length}</div></div>
+      <div class="stat"><div class="k">평균</div><div class="v">${avg.toFixed(1)}</div></div>
+      <div class="stat"><div class="k">최고</div><div class="v">${mx}</div></div>
+      <div class="stat"><div class="k">최저</div><div class="v">${mn}</div></div>
+    </div>
+    <p style="font-size:13px;font-weight:700;color:var(--muted);margin:0 0 4px">점수 분포 (10점 구간)</p>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img"><title>${roundIdx}회 점수 분포</title>${bars}${labels}${cutLine}</svg>`;
+  // per-question correct rate (only if ox data exists)
+  const oxEntries=entries.filter(e=>e.ox&&e.ox.length>=20);
+  if(oxEntries.length){
+    const meta=S.keys[roundIdx]&&S.keys[roundIdx].meta;
+    const qN=meta?meta.qTo-meta.qFrom+1:30;
+    const rates=[];
+    for(let q=0;q<qN;q++){
+      let o=0,t=0;
+      oxEntries.forEach(e=>{const ch=e.ox[q];if(ch==='O'){o++;t++;}else if(ch==='X'){t++;}});
+      rates.push(t?Math.round(o/t*100):null);
+    }
+    const W2=680,H2=170,p2=30,bw2=(W2-2*p2)/qN;
+    let bars2='',labels2='';
+    rates.forEach((rt,i)=>{
+      if(rt==null)return;
+      const bh=(rt/100)*(H2-2*p2-10);
+      const x=p2+i*bw2,y=H2-p2-bh;
+      const col=rt>=70?'var(--pass)':(rt>=40?'var(--gold)':'var(--fail)');
+      bars2+=`<rect x="${x+1.5}" y="${y}" width="${bw2-3}" height="${Math.max(bh,2)}" rx="2.5" fill="${col}"><title>${i+1}번 정답률 ${rt}%</title></rect>`;
+      if((i+1)%5===0||i===0)labels2+=`<text x="${x+bw2/2}" y="${H2-10}" font-size="10" fill="var(--muted)" text-anchor="middle">${i+1}</text>`;
+    });
+    html+=`
+    <p style="font-size:13px;font-weight:700;color:var(--muted);margin:18px 0 4px">문항별 정답률 ${subjFilter?`· ${subjFilter}`:'· 전체'} <span style="font-weight:600;color:var(--faint)">(23~30번은 선택과목별 문항${subjFilter?'':', 과목 필터로 구분 확인'})</span></p>
+    <svg viewBox="0 0 ${W2} ${H2}" style="width:100%;height:auto" role="img"><title>${roundIdx}회 문항별 정답률</title>
+      <line x1="${p2}" y1="${H2-p2-(70/100)*(H2-2*p2-10)}" x2="${W2-p2}" y2="${H2-p2-(70/100)*(H2-2*p2-10)}" stroke="var(--line-2)" stroke-dasharray="3 3"/>
+      <text x="${W2-p2+2}" y="${H2-p2-(70/100)*(H2-2*p2-10)+3}" font-size="9" fill="var(--faint)">70%</text>
+      ${bars2}${labels2}</svg>
+    <div class="legend"><span><i style="background:var(--pass)"></i>70%↑</span><span><i style="background:var(--gold)"></i>40~69%</span><span><i style="background:var(--fail)"></i>40% 미만</span></div>`;
+  }
+  body.innerHTML=html;
+}
+function alivePerRound(c){
+  // returns idx->count alive after processing that round
+  const res={};let alive=new Set(S.roster.map(r=>r.hakbeon));
+  for(const rd of S.rounds){if(!S.scores[rd.idx]){res[rd.idx]=alive.size;continue;}
+    S.roster.forEach(r=>{const st=c.status[r.hakbeon][rd.idx];if(st==='탈락'||st==='미응시'){if(alive.has(r.hakbeon))alive.delete(r.hakbeon);}});
+    res[rd.idx]=alive.size;}
+  return res;
+}
+
+function renderExport(){
+  const p=$('#p-export');if(!p)return;
+  const ready=S.roster.length>0;
+  p.innerHTML=`
+  <div class="card">
+    <h3>학생용 조회 파일 만들기</h3>
+    <p class="hint">현재까지의 명단·성적·통과기준을 담은 <b>단일 HTML 파일</b>을 만듭니다. 학생들에게 이 파일(또는 링크)을 배포하면, 각자 반·번호·이름으로 본인 결과만 조회합니다. 새 회차를 업로드한 뒤 다시 내보내 배포하세요.</p>
+    <button class="btn gold" id="exportBtn" ${ready?'':'disabled'}><span>학생용 파일 내보내기</span></button>
+    <span class="rdate" style="margin-left:10px">예상 크기 약 ${estimateExportSize()}</span>
+    ${ready?'':'<p class="err" style="margin-top:10px">먼저 참가자 명단을 불러오세요.</p>'}
+    <div class="notice" style="margin-top:16px">배포 파일에는 상대평가·석차 계산용 전체 점수와 문제·해설 파일이 포함됩니다. 학생 조회에는 비밀번호(초기 1234)가 필요하지만, 파일 자체를 코드로 열면 데이터 확인이 가능하므로 공개 웹이 아닌 학급 공유 방식 배포를 권장합니다. 비밀번호를 초기화한 학생이 있으면 파일을 다시 내보내 배포해야 적용됩니다.</div>
+  </div>`;
+  $('#exportBtn')&&($('#exportBtn').onclick=exportStudentFile);
+}
+function estimateExportSize(){
+  let n=200000; // base app
+  n+=JSON.stringify({roster:S.roster,scores:S.scores,keys:S.keys}).length;
+  Object.values(S.files).forEach(f=>n+=(f.data||'').length);
+  return fmtBytes(n);
+}
+function exportStudentFile(){
+  const clone=document.documentElement.cloneNode(true);
+  const data={roster:S.roster,rounds:S.rounds,scores:S.scores,keys:S.keys,files:S.files,options:S.options,mode:'student',generatedAt:new Date().toISOString()};
+  clone.querySelector('#embedded-data').textContent=JSON.stringify(data).replace(/<\//g,'<\\/');
+  clone.setAttribute('data-appmode','student');
+  clone.querySelector('#app').innerHTML='';
+  clone.querySelector('#foot').innerHTML='';
+  const html='<!DOCTYPE html>\n'+clone.outerHTML;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='수학챌린지_학생조회.html';a.click();URL.revokeObjectURL(a.href);
+}
+
+/* ================= STUDENT UI ================= */
+function renderStudent(){
+  $('#rolePill').textContent='학생 조회';
+  document.querySelector('.topbar').after(heroEl());
+  const app=$('#app');app.className='';app.innerHTML='';
+  showLookup();
+}
+function heroEl(){
+  const wrap=ce('div','hero');
+  wrap.innerHTML=`<div class="wrap">
+    <div class="eyebrow">MATH CHALLENGE</div>
+    <h1>내 챌린지 현황 조회</h1>
+    <p>반·번호·이름을 입력하면 생존 여부와 성적 향상을 확인할 수 있어요.</p>
+    <div class="lookup" id="lookupBox"></div>
+  </div>`;
+  return wrap;
+}
+function showLookup(){
+  const box=$('#lookupBox');
+  const bans=[...new Set(S.roster.map(r=>r.ban))].sort((a,b)=>a-b);
+  box.innerHTML=`
+    <div class="row">
+      <div class="field"><label>반</label><select id="lkBan"><option value="">선택</option>${bans.map(b=>`<option>${b}</option>`).join('')}</select></div>
+      <div class="field"><label>번호</label><input id="lkBeon" type="number" inputmode="numeric" placeholder="예: 12"></div>
+      <div class="field"><label>이름</label><input id="lkName" placeholder="이름"></div>
+    </div>
+    <div class="field" style="margin-bottom:12px"><label>비밀번호</label><input id="lkPw" type="password" inputmode="numeric" placeholder="초기 비밀번호 1234" autocomplete="off"></div>
+    <button class="btn" id="lkGo" style="width:100%">내 결과 보기</button>
+    <p class="rdate" style="margin:10px 0 0;text-align:center">처음 접속이라면 비밀번호는 <b>1234</b> 입니다. 로그인 후 꼭 변경하세요.<br>비밀번호를 잊었다면 선생님께 초기화를 요청하세요.</p>
+    <div class="err hidden" id="lkErr"></div>`;
+  $('#lkGo').onclick=()=>{
+    const ban=parseInt($('#lkBan').value), beon=parseInt($('#lkBeon').value), name=$('#lkName').value.trim();
+    const err=$('#lkErr');err.classList.add('hidden');
+    if(isNaN(ban)||isNaN(beon)||!name){err.textContent='반·번호·이름을 모두 입력하세요.';err.classList.remove('hidden');return;}
+    const h=hakbeon(ban,beon);const r=S.roster.find(x=>x.hakbeon===h);
+    if(!r){err.textContent='해당 정보의 참가자를 찾을 수 없습니다. 반·번호를 확인하세요.';err.classList.remove('hidden');return;}
+    if(r.name.replace(/\s/g,'')!==name.replace(/\s/g,'')){err.textContent='이름이 일치하지 않습니다.';err.classList.remove('hidden');return;}
+    const pw=$('#lkPw').value;
+    if(!pw){err.textContent='비밀번호를 입력하세요. (초기 비밀번호 1234)';err.classList.remove('hidden');return;}
+    if(pwHash(pw)!==effectivePwHash(r)){err.textContent='비밀번호가 올바르지 않습니다. 잊었다면 선생님께 초기화를 요청하세요.';err.classList.remove('hidden');return;}
+    showDashboard(r);
+  };
+  ['lkBeon','lkName','lkPw'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{if(e.key==='Enter')$('#lkGo').click();}));
+}
+function showDashboard(r){
+  const c=compute();const pp=c.per[r.hakbeon];const app=$('#app');
+  document.querySelector('.hero').classList.add('hidden');
+  app.className='dash';
+  const initials=r.name.slice(0,2);
+  const improveHtml=pp.improve==null?'<span style="color:var(--faint)">-</span>':`<span class="${pp.improve>0?'up':(pp.improve<0?'down':'')}">${pp.improve>0?'+':''}${pp.improve}</span>`;
+  app.innerHTML=`
+  <div class="wrap">
+    <button class="btn ghost sm" id="backBtn" style="margin-bottom:14px">← 다른 학생 조회</button>
+    <div class="idcard">
+      <div class="av">${initials}</div>
+      <div>
+        <div class="nm">${r.name} ${r.nickname?`<span style="font-size:13px;color:var(--muted);font-weight:600">· "${r.nickname}"</span>`:''}</div>
+        <div class="sub">${r.ban}반 ${r.beon}번 · ${r.subject||'선택과목 미정'}</div>
+      </div>
+      <div class="survbadge"><span class="b ${pp.alive?'alive':'dead'}">${pp.alive?'🏆 생존':'탈락'}</span>
+        ${!pp.alive&&pp.outAt?`<div class="rdate" style="margin-top:5px">${pp.outAt}회에서 탈락</div>`:''}</div>
+    </div>
+
+    <div class="mcards">
+      <div class="mc"><div class="k">응시 횟수</div><div class="v">${pp.count}<small>/${S.rounds.length}</small></div></div>
+      <div class="mc"><div class="k">최근 점수</div><div class="v">${pp.lastScore==null?'-':pp.lastScore}<small>${pp.lastScore==null?'':'점'}</small></div></div>
+      <div class="mc"><div class="k">성적 향상도</div><div class="v">${improveHtml}</div></div>
+      <div class="mc"><div class="k">현재 상태</div><div class="v" style="font-size:18px;padding-top:6px">${pp.alive?'<span class="up">생존 중</span>':'<span class="down">탈락</span>'}</div></div>
+    </div>
+
+    <div class="section">
+      <h3>10회 진행 현황</h3>
+      <div class="track" id="track"></div>
+      <div class="legend">
+        <span><i style="background:var(--pass-soft)"></i>통과</span>
+        <span><i style="background:var(--revive-soft)"></i>부활</span>
+        <span><i style="background:var(--fail-soft)"></i>탈락</span>
+        <span><i style="background:#EEF1F5"></i>미응시</span>
+        <span><i style="background:#EFF3FA"></i>예정</span>
+      </div>
+    </div>
+
+    <div class="section" id="trendSec"></div>
+
+    <div class="section">
+      <h3>회차별 정오표 <span>점수 · 석차 · 상위%</span></h3>
+      <div class="roundlist" id="roundList"></div>
+    </div>
+
+    <div class="section" id="matSec"></div>
+
+    <div class="section">
+      <h3>비밀번호 변경</h3>
+      <div class="pwform">
+        <input id="pwCur" type="password" placeholder="현재 비밀번호" autocomplete="off">
+        <input id="pwNew" type="password" placeholder="새 비밀번호 (4자 이상)" autocomplete="off">
+        <input id="pwNew2" type="password" placeholder="새 비밀번호 확인" autocomplete="off">
+        <button class="btn sm" id="pwSave">변경하기</button>
+      </div>
+      <p class="rdate" style="margin:8px 0 0">비밀번호는 지금 사용 중인 이 기기(브라우저)에 저장됩니다. 다른 기기에서는 초기 비밀번호(또는 그 기기에서 설정한 비밀번호)로 접속하세요.</p>
+      <div class="err hidden" id="pwMsg"></div>
+    </div>
+  </div>`;
+  $('#backBtn').onclick=()=>{document.querySelector('.hero').classList.remove('hidden');app.className='';app.innerHTML='';showLookup();window.scrollTo(0,0);};
+
+  // materials
+  const ms=$('#matSec');
+  const matRounds=S.rounds.filter(rd=>S.files[rd.idx+':problem']||S.files[rd.idx+':solution']);
+  if(!matRounds.length){ms.innerHTML='<h3>문제 · 해설지</h3><p class="hint" style="margin:0">아직 등록된 자료가 없습니다.</p>';}
+  else{
+    ms.innerHTML='<h3>문제 · 해설지 <span>다운로드</span></h3>'+matRounds.map(rd=>{
+      const pk=rd.idx+':problem',sk=rd.idx+':solution';
+      return `<div class="matrow"><span class="rl" style="font-size:13.5px;font-weight:800;color:var(--navy)">${rd.idx}회 <small style="font-weight:600;color:var(--muted)">${rd.date}</small></span>
+        ${S.files[pk]?`<button class="btn ghost sm" data-mdl="${pk}">📄 문제지</button>`:''}
+        ${S.files[sk]?`<button class="btn ghost sm" data-mdl="${sk}">✅ 해설지</button>`:''}</div>`;
+    }).join('');
+    ms.querySelectorAll('[data-mdl]').forEach(b=>b.onclick=()=>downloadMaterial(b.dataset.mdl));
+  }
+  // password change
+  $('#pwSave').onclick=()=>{
+    const msg=$('#pwMsg');msg.classList.add('hidden');msg.style.color='';
+    const cur=$('#pwCur').value,nw=$('#pwNew').value,nw2=$('#pwNew2').value;
+    if(pwHash(cur)!==effectivePwHash(r)){msg.textContent='현재 비밀번호가 올바르지 않습니다.';msg.classList.remove('hidden');return;}
+    if(nw.length<4){msg.textContent='새 비밀번호는 4자 이상이어야 합니다.';msg.classList.remove('hidden');return;}
+    if(nw!==nw2){msg.textContent='새 비밀번호가 서로 다릅니다.';msg.classList.remove('hidden');return;}
+    setPwRecord(r.hakbeon,nw);
+    $('#pwCur').value=$('#pwNew').value=$('#pwNew2').value='';
+    msg.textContent='비밀번호가 변경되었습니다. 다음 접속부터 새 비밀번호를 사용하세요.';msg.style.color='var(--pass)';msg.classList.remove('hidden');
+  };
+  // track
+  const tk=$('#track');
+  S.rounds.forEach(rd=>{
+    const st=pp.status[rd.idx];
+    let cls='wait',mark='예정';
+    if(st==='통과'){cls='pass';mark='✓';}
+    else if(st==='부활'){cls='revive';mark='부활';}
+    else if(st==='탈락'){cls='fail';mark='✕';}
+    else if(st==='미응시'){cls='miss';mark='결시';}
+    else if(st==='해당없음'){cls='out';mark='—';}
+    else if(st==='대기'){cls='wait';mark='예정';}
+    const el=ce('div','tstop '+cls);
+    el.innerHTML=`<div class="d">${rd.date}</div>${mark}`;
+    tk.appendChild(el);
+  });
+  // trend
+  drawTrend($('#trendSec'),pp);
+  // round list
+  const rl=$('#roundList');
+  if(!pp.taken.length){rl.innerHTML='<p class="hint" style="margin:0">아직 응시한 회차가 없습니다.</p>';}
+  pp.taken.forEach(t=>{
+    let gs='';
+    if(t.obj!=null||t.sbj!=null)gs=`객관식 <b>${t.obj??'-'}</b> · 주관식 <b>${t.sbj??'-'}</b>`;
+    else if(t.gong!=null||t.sel!=null)gs=`공통 <b>${t.gong??'-'}</b> · 선택 <b>${t.sel??'-'}</b>`;
+    const rd=ce('div','rd');
+    const hasOX=t.ox&&t.ox.length>=20;
+    rd.innerHTML=`
+      <div class="rl">${t.idx}회<small>${t.date}</small></div>
+      <div class="mid">석차 <b>${t.rank}</b>/${t.N}위 · 상위 <b>${t.pct}%</b>${t.sN>1?` · ${r.subject} 내 <b>${t.srank}</b>/${t.sN}`:''}<br>${gs}${hasOX?` <button class="btn ghost sm" data-ox="${t.idx}" style="margin-left:6px;padding:3px 10px;font-size:12px">정오표 보기</button>`:''}</div>
+      <div class="sc">${t.score}<small>점</small></div>`;
+    rl.appendChild(rd);
+    if(hasOX){
+      const det=ce('div','oxdetail hidden');
+      det.id='ox-'+t.idx;
+      det.innerHTML=buildOXGrid(t,r);
+      rl.appendChild(det);
+    }
+  });
+  rl.querySelectorAll('[data-ox]').forEach(b=>b.onclick=()=>{
+    const d=$('#ox-'+b.dataset.ox);d.classList.toggle('hidden');
+    b.textContent=d.classList.contains('hidden')?'정오표 보기':'정오표 닫기';
+  });
+}
+function buildOXGrid(t,r){
+  const keyPack=S.keys[t.idx];
+  const subj=r.subject||'';
+  const key=keyPack&&keyPack.keys&&keyPack.keys[subj];
+  const keyStr=key?key.blocks.join(''):null;   // 30-char: digits or J
+  const juKey=key?key.ju:null;                  // subjective correct answers
+  // map J positions (question numbers, ascending) -> ju index
+  let juMap={};
+  if(keyStr){let ji=0;[...keyStr].forEach((ch,i)=>{if(ch==='J'){juMap[i]=ji++;}});}
+  const n=t.ox.length;
+  let cells='';
+  let right=0,total=0;
+  for(let i=0;i<n;i++){
+    const ch=t.ox[i];if(ch!=='O'&&ch!=='X')continue;
+    total++;if(ch==='O')right++;
+    const isJu=keyStr&&keyStr[i]==='J';
+    let tip='';
+    if(keyStr){
+      if(isJu&&juKey){const ji=juMap[i];tip=`정답 ${juKey[ji]??'-'}${t.ju&&t.ju[ji]!=null?` · 내 답 ${t.ju[ji]}`:''}`;}
+      else{tip=`정답 ${keyStr[i]}`;}
+    }
+    cells+=`<div class="oxcell ${ch==='O'?'o':'x'}" title="${i+1}번 ${tip}">${i+1}<span>${ch}</span></div>`;
+  }
+  // subjective comparison rows (wrong ones highlighted)
+  let juTable='';
+  if(juKey&&t.ju){
+    const rows=Object.entries(juMap).map(([qi,ji])=>{
+      const q=+qi+1,ans=juKey[ji],mine=t.ju[ji];
+      const ok=t.ox[qi]==='O';
+      return `<tr${ok?'':' style="background:var(--fail-soft)"'}><td>${q}번</td><td class="num">${mine==null?'-':mine}</td><td class="num">${ans==null?'-':ans}</td><td>${ok?'<span class="tag pass">O</span>':'<span class="tag fail">X</span>'}</td></tr>`;
+    }).join('');
+    juTable=`<p style="font-size:12.5px;font-weight:700;color:var(--muted);margin:14px 0 6px">주관식 답안 비교</p>
+      <div class="tablewrap" style="max-height:none"><table><thead><tr><th>문항</th><th class="num">내 답</th><th class="num">정답</th><th>결과</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  return `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+      <span style="font-size:12.5px;font-weight:700;color:var(--muted)">문항별 채점 결과</span>
+      <span style="font-size:12px;color:var(--muted)">맞은 문항 <b>${right}</b>/${total}</span></div>
+    <div class="oxgrid">${cells}</div>
+    <p style="font-size:11px;color:var(--faint);margin:8px 0 0">1~22번 공통 · 23~30번 ${subj||'선택'} · 문항을 길게 누르면 정답 확인</p>
+    ${juTable}`;
+}
+function drawTrend(sec,pp){
+  sec.innerHTML=`<h3>성적 추이 <span>${pp.count?`${pp.firstScore} → ${pp.lastScore}`:''}</span></h3>`;
+  if(pp.taken.length<1){sec.innerHTML+='<p class="hint" style="margin:0">데이터가 쌓이면 추이가 표시됩니다.</p>';return;}
+  const W=680,H=140,pad=28;
+  const xs=pp.taken.map((t,i)=>pp.taken?i:i);
+  const n=pp.taken.length;
+  const scores=pp.taken.map(t=>t.score);
+  const mn=Math.min(...scores,0), mx=Math.max(...scores,100);
+  const X=i=>pad+(n===1?0.5:(i/(n-1)))*(W-2*pad);
+  const Y=v=>H-pad-((v-mn)/((mx-mn)||1))*(H-2*pad);
+  const pts=pp.taken.map((t,i)=>`${X(i)},${Y(t.score)}`).join(' ');
+  const dots=pp.taken.map((t,i)=>`<circle cx="${X(i)}" cy="${Y(t.score)}" r="4" fill="var(--navy)"/><text x="${X(i)}" y="${Y(t.score)-9}" font-size="11" fill="var(--ink)" text-anchor="middle" font-weight="700">${t.score}</text><text x="${X(i)}" y="${H-8}" font-size="10" fill="var(--muted)" text-anchor="middle">${t.idx}회</text>`).join('');
+  const svg=`<svg class="trend" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img"><title>회차별 점수 추이</title>
+    ${n>1?`<polyline points="${pts}" fill="none" stroke="var(--gold)" stroke-width="2.5"/>`:''}
+    ${dots}</svg>`;
+  sec.innerHTML+=svg;
+}
+
+/* ================= BOOT ================= */
+function boot(){
+  loadState();
+  if(S.mode==='student'){document.documentElement.setAttribute('data-appmode','student');renderStudent();}
+  else{renderAdmin();
+    FDB.open().then(()=>FDB.all()).then(f=>{if(f&&Object.keys(f).length){S.files=f;renderScores();renderExport();}});
+  }
+  $('#foot').innerHTML=`수학 모의고사 챌린지 · ${S.mode==='student'?'학생 조회':'관리자'} · 총 ${S.rounds.length}회`;
+}
+document.addEventListener('DOMContentLoaded',boot);
+</script>
+</body>
+</html>
