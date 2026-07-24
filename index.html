@@ -982,6 +982,8 @@ function showDashboard(r){
 
     <div class="section" id="trendSec"></div>
 
+    <div class="section" id="distSec"></div>
+
     <div class="section">
       <h3>회차별 정오표 <span>점수 · 석차 · 상위%</span></h3>
       <div class="roundlist" id="roundList"></div>
@@ -1003,19 +1005,24 @@ function showDashboard(r){
   </div>`;
   $('#backBtn').onclick=()=>{document.querySelector('.hero').classList.remove('hidden');app.className='';app.innerHTML='';showLookup();window.scrollTo(0,0);};
 
-  // materials
+  // materials (외부 링크 안내 + 첨부파일이 있으면 함께 표시)
   const ms=$('#matSec');
+  const MURL=(S.options&&S.options.materialUrl)||'https://myip.kr/rOJqc';
   const matRounds=S.rounds.filter(rd=>S.files[rd.idx+':problem']||S.files[rd.idx+':solution']);
-  if(!matRounds.length){ms.innerHTML='<h3>문제 · 해설지</h3><p class="hint" style="margin:0">아직 등록된 자료가 없습니다.</p>';}
-  else{
-    ms.innerHTML='<h3>문제 · 해설지 <span>다운로드</span></h3>'+matRounds.map(rd=>{
+  let mh='<h3>문제 · 해설지 <span>바로가기</span></h3>'+
+    `<p class="hint" style="margin:0 0 12px">회차별 문제지와 해설지는 아래 자료실에서 확인하세요.</p>
+     <a class="btn gold" href="${MURL}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block">📄 문제 · 해설 자료실 열기</a>
+     <p class="rdate" style="margin:10px 0 0">새 창으로 열립니다.</p>`;
+  if(matRounds.length){
+    mh+='<div class="rdate" style="margin:16px 0 6px;font-weight:700">이 앱에 첨부된 자료</div>'+matRounds.map(rd=>{
       const pk=rd.idx+':problem',sk=rd.idx+':solution';
       return `<div class="matrow"><span class="rl" style="font-size:13.5px;font-weight:800;color:var(--navy)">${rd.idx}회 <small style="font-weight:600;color:var(--muted)">${rd.date}</small></span>
         ${S.files[pk]?`<button class="btn ghost sm" data-mdl="${pk}">📄 문제지</button>`:''}
         ${S.files[sk]?`<button class="btn ghost sm" data-mdl="${sk}">✅ 해설지</button>`:''}</div>`;
     }).join('');
-    ms.querySelectorAll('[data-mdl]').forEach(b=>b.onclick=()=>downloadMaterial(b.dataset.mdl));
   }
+  ms.innerHTML=mh;
+  ms.querySelectorAll('[data-mdl]').forEach(b=>b.onclick=()=>downloadMaterial(b.dataset.mdl));
   // password change
   $('#pwSave').onclick=()=>{
     const msg=$('#pwMsg');msg.classList.add('hidden');msg.style.color='';
@@ -1044,6 +1051,8 @@ function showDashboard(r){
   });
   // trend
   drawTrend($('#trendSec'),pp);
+  // 점수 분포 속 내 위치
+  drawStudentDist(r,pp);
   // round list
   const rl=$('#roundList');
   if(!pp.taken.length){rl.innerHTML='<p class="hint" style="margin:0">아직 응시한 회차가 없습니다.</p>';}
@@ -1069,6 +1078,82 @@ function showDashboard(r){
     const d=$('#ox-'+b.dataset.ox);d.classList.toggle('hidden');
     b.textContent=d.classList.contains('hidden')?'정오표 보기':'정오표 닫기';
   });
+}
+function drawStudentDist(r,pp){
+  const sec=$('#distSec'); if(!sec)return;
+  const taken=pp.taken;
+  if(!taken.length){ sec.innerHTML='<h3>점수 분포 속 내 위치</h3><p class="hint" style="margin:0">회차에 응시하면 전체 점수 분포에서 내 위치를 볼 수 있습니다.</p>'; return; }
+  const st={idx:taken[taken.length-1].idx, scope:'all'};
+  const subj=r.subject||'';
+  sec.innerHTML=`<h3>점수 분포 속 내 위치 <span>익명 · 전체 현황</span></h3>
+    <p class="hint" style="margin:0 0 12px">누가 몇 점인지는 표시되지 않습니다. 구간별 인원과 내 위치만 보여줍니다.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+      <select id="distRound" style="padding:9px 11px;border:1px solid var(--line-2);border-radius:9px;color:var(--ink);background:#fff">
+        ${taken.map(t=>`<option value="${t.idx}"${t.idx===st.idx?' selected':''}>${t.idx}회 (${t.date})</option>`).join('')}
+      </select>
+      ${subj?`<span id="distScope" style="display:inline-flex;gap:6px">
+        <button class="btn ghost sm" data-sc="all">전체</button>
+        <button class="btn ghost sm" data-sc="subj">${subj}만</button></span>`:''}
+    </div>
+    <div id="distBody"></div>`;
+  const paint=()=>{
+    const body=$('#distBody'); if(!body)return;
+    const idx=+$('#distRound').value;
+    const me=taken.find(t=>t.idx===idx); if(!me){body.innerHTML='';return;}
+    const data=S.scores[idx]||{};
+    let entries=Object.keys(data).map(h=>({h,score:data[h].score}));
+    if(st.scope==='subj'&&subj){
+      entries=entries.filter(x=>{const rr=S.roster.find(y=>y.hakbeon===x.h);return rr&&rr.subject===subj;});
+    }
+    const N=entries.length;
+    if(!N){body.innerHTML='<p class="hint" style="margin:0">해당 조건의 응시자가 없습니다.</p>';return;}
+    const scores=entries.map(e=>e.score);
+    const avg=scores.reduce((a,b)=>a+b,0)/N;
+    const rank=1+scores.filter(s=>s>me.score).length;
+    const pct=Math.round((1-(rank-1)/N)*100);
+    const bins=Array(10).fill(0);
+    scores.forEach(s=>{bins[Math.min(9,Math.max(0,Math.floor(s/10)))]++;});
+    const myBin=Math.min(9,Math.max(0,Math.floor(me.score/10)));
+    const bmax=Math.max(...bins,1);
+    const W=680,H=200,pad=32,bw=(W-2*pad)/10;
+    let bars='',labels='';
+    bins.forEach((n,i)=>{
+      const bh=(n/bmax)*(H-2*pad-16);
+      const x=pad+i*bw,y=H-pad-bh;
+      const mine=(i===myBin);
+      bars+=`<rect x="${x+3}" y="${y}" width="${bw-6}" height="${Math.max(bh,n?3:0)}" rx="4" fill="${mine?'var(--gold)':'var(--line-2)'}"/>`;
+      if(n)bars+=`<text x="${x+bw/2}" y="${y-5}" font-size="11" font-weight="700" fill="${mine?'var(--gold-ink)':'var(--muted)'}" text-anchor="middle">${n}</text>`;
+      labels+=`<text x="${x+bw/2}" y="${H-11}" font-size="10" fill="var(--muted)" text-anchor="middle">${i*10}${i===9?'~100':''}</text>`;
+    });
+    const mx=pad+(Math.min(100,Math.max(0,me.score))/100)*(W-2*pad);
+    const ax=pad+(Math.min(100,Math.max(0,avg))/100)*(W-2*pad);
+    const meLine=`<line x1="${mx}" y1="${pad-8}" x2="${mx}" y2="${H-pad}" stroke="var(--navy)" stroke-width="2"/>`+
+      `<text x="${mx}" y="${pad-12}" font-size="11" font-weight="800" fill="var(--navy)" text-anchor="middle">내 ${me.score}점</text>`;
+    const avgLine=`<line x1="${ax}" y1="${pad+4}" x2="${ax}" y2="${H-pad}" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="4 3"/>`+
+      `<text x="${ax}" y="${H-pad+13}" font-size="10" fill="var(--muted)" text-anchor="middle">평균 ${avg.toFixed(1)}</text>`;
+    const diff=(me.score-avg);
+    body.innerHTML=`
+      <div class="statrow" style="margin-bottom:14px">
+        <div class="stat"><div class="k">내 점수</div><div class="v">${me.score}</div></div>
+        <div class="stat"><div class="k">석차</div><div class="v">${rank}<small style="font-size:13px;color:var(--muted)">/${N}</small></div></div>
+        <div class="stat"><div class="k">상위</div><div class="v">${pct}<small style="font-size:13px;color:var(--muted)">%</small></div></div>
+        <div class="stat"><div class="k">평균 대비</div><div class="v ${diff>=0?'up':'down'}">${diff>=0?'+':''}${diff.toFixed(1)}</div></div>
+      </div>
+      <p style="font-size:13px;font-weight:700;color:var(--muted);margin:0 0 4px">점수 분포 (10점 구간 · 응시 ${N}명)</p>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img"><title>${idx}회 점수 분포와 내 위치</title>${bars}${labels}${avgLine}${meLine}</svg>
+      <p class="rdate" style="margin:6px 0 0">노란 막대가 내가 속한 점수 구간입니다.</p>`;
+  };
+  $('#distRound').onchange=paint;
+  const sc=$('#distScope');
+  if(sc){
+    const upd=()=>sc.querySelectorAll('[data-sc]').forEach(b=>{
+      const on=b.dataset.sc===st.scope;
+      b.style.background=on?'var(--navy)':''; b.style.color=on?'#fff':''; b.style.borderColor=on?'var(--navy)':'';
+    });
+    sc.querySelectorAll('[data-sc]').forEach(b=>b.onclick=()=>{st.scope=b.dataset.sc;upd();paint();});
+    upd();
+  }
+  paint();
 }
 function buildOXGrid(t,r){
   const keyPack=S.keys[t.idx];
