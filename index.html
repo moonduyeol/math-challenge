@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" data-appmode="admin">
+<html lang="ko" data-appmode="student">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -333,11 +333,10 @@ function compute(){
     taken.forEach(t=>{
       const d=scores[t.idx];
       const all=Object.keys(d).map(k=>({h:k,score:d[k].score}));
-      const alSort=[...all].sort((a,b)=>b.score-a.score);
-      t.rank=alSort.findIndex(x=>x.h===h)+1; t.N=all.length;
+      t.rank=1+all.filter(x=>x.score>t.score).length; t.N=all.length;   // 동점자 공동 순위
       t.pct=t.N?Math.round((1-(t.rank-1)/t.N)*100):null;
-      const sameSubj=all.filter(x=>{const rr=roster.find(y=>y.hakbeon===x.h);return rr&&rr.subject===r.subject;}).sort((a,b)=>b.score-a.score);
-      t.srank=sameSubj.findIndex(x=>x.h===h)+1; t.sN=sameSubj.length;
+      const sameSubj=all.filter(x=>{const rr=roster.find(y=>y.hakbeon===x.h);return rr&&rr.subject===r.subject;});
+      t.srank=1+sameSubj.filter(x=>x.score>t.score).length; t.sN=sameSubj.length;
     });
     const first=taken[0], last=taken[taken.length-1];
     per[h]={
@@ -844,7 +843,7 @@ function alivePerRound(c){
   // returns idx->count alive after processing that round
   const res={};let alive=new Set(S.roster.map(r=>r.hakbeon));
   for(const rd of S.rounds){if(!S.scores[rd.idx]){res[rd.idx]=alive.size;continue;}
-    S.roster.forEach(r=>{const st=c.status[r.hakbeon][rd.idx];if(st==='탈락'||st==='미응시'){if(alive.has(r.hakbeon))alive.delete(r.hakbeon);}});
+    S.roster.forEach(r=>{const st=c.status[r.hakbeon][rd.idx];if(st==='탈락'||(S.options.missCounts&&st==='미응시')){if(alive.has(r.hakbeon))alive.delete(r.hakbeon);}});
     res[rd.idx]=alive.size;}
   return res;
 }
@@ -856,12 +855,29 @@ function renderExport(){
   <div class="card">
     <h3>학생용 조회 파일 만들기</h3>
     <p class="hint">현재까지의 명단·성적·통과기준을 담은 <b>단일 HTML 파일</b>을 만듭니다. 학생들에게 이 파일(또는 링크)을 배포하면, 각자 반·번호·이름으로 본인 결과만 조회합니다. 새 회차를 업로드한 뒤 다시 내보내 배포하세요.</p>
-    <button class="btn gold" id="exportBtn" ${ready?'':'disabled'}><span>학생용 파일 내보내기</span></button>
-    <span class="rdate" style="margin-left:10px">예상 크기 약 ${estimateExportSize()}</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn gold" id="exportBtnGh" ${ready?'':'disabled'}>GitHub Pages용 내보내기 (index.html)</button>
+      <button class="btn ghost" id="exportBtn" ${ready?'':'disabled'}>일반 파일로 내보내기</button>
+      <span class="rdate">예상 크기 약 ${estimateExportSize()}</span>
+    </div>
     ${ready?'':'<p class="err" style="margin-top:10px">먼저 참가자 명단을 불러오세요.</p>'}
     <div class="notice" style="margin-top:16px">배포 파일에는 상대평가·석차 계산용 전체 점수와 문제·해설 파일이 포함됩니다. 학생 조회에는 비밀번호(초기 1234)가 필요하지만, 파일 자체를 코드로 열면 데이터 확인이 가능하므로 공개 웹이 아닌 학급 공유 방식 배포를 권장합니다. 비밀번호를 초기화한 학생이 있으면 파일을 다시 내보내 배포해야 적용됩니다.</div>
+  </div>
+  <div class="card">
+    <h3>GitHub Pages로 배포하기 <span class="rdate">— 주소 고정 · 학생은 새로고침만 · 비밀번호 유지</span></h3>
+    <p class="hint" style="margin-bottom:6px"><b>최초 1회 설정 (약 10분)</b></p>
+    <p style="font-size:13.5px;margin:0 0 14px;line-height:1.8">
+    ① <b>github.com</b> 가입(무료) →
+    ② 우측 상단 <b>+ → New repository</b> → 이름은 추측하기 어렵게(예: jc-math-2026-x7) → <b>Public</b> 선택 → Create repository →
+    ③ <b>Add file → Upload files</b> → 위 버튼으로 내보낸 <b>index.html</b> 업로드 → Commit changes →
+    ④ <b>Settings → Pages</b> → Source: <b>Deploy from a branch</b>, Branch: <b>main / (root)</b> → Save →
+    ⑤ 1~2분 후 <b>https://아이디.github.io/저장소이름/</b> 접속 확인 → 이 주소를 단톡방 공지로 고정.</p>
+    <p class="hint" style="margin-bottom:6px"><b>매 회차 업데이트</b></p>
+    <p style="font-size:13.5px;margin:0 0 14px;line-height:1.8">여기서 <b>GitHub Pages용 내보내기</b> → 저장소에서 <b>Add file → Upload files</b>로 index.html 다시 올리고 Commit(같은 이름이라 자동 교체) → 1~2분 후 반영. 학생은 <b>같은 주소를 새로고침</b>만 하면 됩니다(반영까지 최대 10분 캐시). 주소가 고정이므로 학생이 바꾼 비밀번호도 각자 기기에 계속 유지됩니다.</p>
+    <div class="notice info">무료 계정은 Public 저장소만 Pages를 쓸 수 있어 주소를 아는 사람은 누구나 접근할 수 있습니다. 저장소 이름을 추측 어렵게 짓고 링크는 단톡방에만 공유하세요(조회에는 비밀번호 필요). 웹 업로드는 파일당 25MB 제한이 있으니 위의 예상 크기를 확인하고 해설지 PDF는 압축해서 올리는 것을 권장합니다.</div>
   </div>`;
-  $('#exportBtn')&&($('#exportBtn').onclick=exportStudentFile);
+  $('#exportBtn')&&($('#exportBtn').onclick=()=>exportStudentFile('수학챌린지_학생조회.html'));
+  $('#exportBtnGh')&&($('#exportBtnGh').onclick=()=>exportStudentFile('index.html'));
 }
 function estimateExportSize(){
   let n=200000; // base app
@@ -869,7 +885,7 @@ function estimateExportSize(){
   Object.values(S.files).forEach(f=>n+=(f.data||'').length);
   return fmtBytes(n);
 }
-function exportStudentFile(){
+function exportStudentFile(fname){
   const clone=document.documentElement.cloneNode(true);
   const data={roster:S.roster,rounds:S.rounds,scores:S.scores,keys:S.keys,files:S.files,options:S.options,mode:'student',generatedAt:new Date().toISOString()};
   clone.querySelector('#embedded-data').textContent=JSON.stringify(data).replace(/<\//g,'<\\/');
@@ -879,7 +895,7 @@ function exportStudentFile(){
   const html='<!DOCTYPE html>\n'+clone.outerHTML;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='수학챌린지_학생조회.html';a.click();URL.revokeObjectURL(a.href);
+  a.download=fname||'수학챌린지_학생조회.html';a.click();URL.revokeObjectURL(a.href);
 }
 
 /* ================= STUDENT UI ================= */
@@ -1113,14 +1129,41 @@ function drawTrend(sec,pp){
   sec.innerHTML+=svg;
 }
 
-/* ================= BOOT ================= */
-function boot(){
-  loadState();
-  if(S.mode==='student'){document.documentElement.setAttribute('data-appmode','student');renderStudent();}
-  else{renderAdmin();
-    FDB.open().then(()=>FDB.all()).then(f=>{if(f&&Object.keys(f).length){S.files=f;renderScores();renderExport();}});
+/* ================= BOOT (학생 실시간 조회판 · data.json 자동 로드) ================= */
+async function boot(){
+  document.documentElement.setAttribute('data-appmode','student');
+  $('#rolePill').textContent='학생 조회';
+  let data=null;
+  // (1) 파일에 데이터가 박혀 있으면 그대로 사용 (예전 단일파일 배포 호환)
+  try{const emb=JSON.parse($('#embedded-data').textContent||'null');if(emb&&emb.roster&&emb.roster.length)data=emb;}catch(e){}
+  // (2) 없으면 같은 폴더의 data.json 을 읽어온다
+  if(!data){
+    try{
+      const res=await fetch('data.json?v='+Date.now(),{cache:'no-store'});
+      if(res.ok)data=await res.json();
+    }catch(e){}
   }
-  $('#foot').innerHTML=`수학 모의고사 챌린지 · ${S.mode==='student'?'학생 조회':'관리자'} · 총 ${S.rounds.length}회`;
+  if(data&&data.roster&&data.roster.length){
+    S=data;
+    S.files=data.files||{};
+    S.rounds=data.rounds||defaultRounds();
+    S.scores=data.scores||{};
+    S.keys=data.keys||{};
+    S.options=data.options||{missCounts:true};
+    S.mode='student';
+    renderStudent();
+    const upd=data.generatedAt?(' · 갱신 '+new Date(data.generatedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'';
+    $('#foot').innerHTML=`수학 모의고사 챌린지 · 학생 조회 · 총 ${S.rounds.length}회${upd}`;
+  }else{
+    S=blankState();S.mode='student';
+    renderStudentEmpty();
+    $('#foot').innerHTML='수학 모의고사 챌린지 · 학생 조회';
+  }
+}
+function renderStudentEmpty(){
+  document.querySelector('.topbar').after(heroEl());
+  const box=$('#lookupBox');
+  if(box)box.innerHTML='<div class="notice info" style="margin:0">아직 성적이 등록되지 않았어요. 시험 결과가 올라오면 이 화면에서 반·번호·이름으로 조회할 수 있습니다.<br>선생님이 결과를 올린 뒤 이 페이지를 <b>새로고침</b> 해주세요.</div>';
 }
 document.addEventListener('DOMContentLoaded',boot);
 </script>
