@@ -265,6 +265,17 @@ function saveState(){if(S.mode==='student')return;try{localStorage.setItem('chal
 /* ================= SURVIVAL ENGINE ================= */
 function compute(){
   const roster=S.roster, rounds=S.rounds, scores=S.scores;
+  // 정오표에 점수가 있으나 명단에 없는 학번은 자동으로 명단에 포함
+  {
+    const known=new Set(roster.map(r=>r.hakbeon));
+    Object.values(scores||{}).forEach(m=>{ if(!m)return; Object.keys(m).forEach(h=>{
+      if(known.has(h))return; known.add(h);
+      const rec=m[h]||{};
+      const ban=parseInt(String(h).slice(-4,-2),10)||0, beon=parseInt(String(h).slice(-2),10)||0;
+      roster.push({hakbeon:h,ban,beon,name:rec.name||('학번 '+h),subject:rec.subject||'',nickname:'',auto:true});
+    }); });
+    roster.sort((a,b)=>(a.ban-b.ban)||(a.beon-b.beon));
+  }
   const alive=new Set(roster.map(r=>r.hakbeon));
   const outAt={};                 // hakbeon -> round idx eliminated
   const status={};                // hakbeon -> {roundIdx: '통과'|'탈락'|'미응시'|'부활'|'대기'|'해당없음'}
