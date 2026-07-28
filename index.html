@@ -1258,6 +1258,25 @@ function drawTrend(sec,pp){
 }
 
 /* ================= BOOT (학생 실시간 조회판 · data.json 자동 로드) ================= */
+function syncAutoRoster(){
+  if(!S.roster||!S.scores)return 0;
+  const known=new Set(S.roster.map(r=>r.hakbeon));
+  let added=0;
+  Object.values(S.scores).forEach(m=>{ if(!m)return; Object.keys(m).forEach(h=>{
+    const rec=m[h]||{};
+    let ex=S.roster.find(x=>x.hakbeon===h);
+    if(!ex){
+      const ban=parseInt(String(h).slice(-4,-2),10)||0, beon=parseInt(String(h).slice(-2),10)||0;
+      S.roster.push({hakbeon:h,ban,beon,name:rec.name||('학번 '+h),subject:rec.subject||'',nickname:'',auto:true});
+      known.add(h); added++;
+    } else if(ex.auto){
+      if(rec.name && (!ex.name||/^학번\s/.test(ex.name))) ex.name=rec.name;
+      if(rec.subject && !ex.subject) ex.subject=rec.subject;
+    }
+  });});
+  if(added){ S.roster.sort((a,b)=>(a.ban-b.ban)||(a.beon-b.beon)); }
+  return added;
+}
 async function boot(){
   document.documentElement.setAttribute('data-appmode','student');
   $('#rolePill').textContent='학생 조회';
@@ -1279,6 +1298,7 @@ async function boot(){
     S.keys=data.keys||{};
     S.options=data.options||{missCounts:true};
     S.mode='student';
+    syncAutoRoster();
     renderStudent();
     const upd=data.generatedAt?(' · 갱신 '+new Date(data.generatedAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'';
     $('#foot').innerHTML=`수학 모의고사 챌린지 · 학생 조회 · 총 ${S.rounds.length}회${upd}`;
