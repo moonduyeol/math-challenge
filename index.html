@@ -204,7 +204,19 @@ const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const ce=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
 const round=(n)=>Math.round(n);
 const pad2=(n)=>String(n).padStart(2,'0');
-const hakbeon=(ban,beon)=>`3${pad2(ban)}${pad2(beon)}`;
+const hakbeon=(ban,beon,sidx)=>schoolPrefix(sidx)+`3${pad2(ban)}${pad2(beon)}`;
+function schoolList(){ return ((S.options&&S.options.schools)||[]).filter(x=>x&&String(x).trim()); }
+function twoSchoolOn(){ return schoolList().length>=2; }
+function schoolPrefix(sidx){ if(!twoSchoolOn())return ''; sidx=+sidx||0; return sidx>0?('S'+sidx+'-'):''; }
+function schoolName(sidx){ const L=(S.options&&S.options.schools)||[]; return L[+sidx||0]||''; }
+function detectSchoolIdx(fname){
+  const L=(S.options&&S.options.schools)||[]; fname=String(fname||'');
+  for(let i=0;i<L.length;i++){ if(L[i]&&fname.includes(L[i]))return i; }
+  const hasYeo=/여자|여고/, hasBu=/부속|부고/;
+  if(hasYeo.test(fname)){ const i=L.findIndex(n=>hasYeo.test(n||'')); if(i>=0)return i; }
+  if(hasBu.test(fname)){ const i=L.findIndex(n=>hasBu.test(n||'')); if(i>=0)return i; }
+  return -1;
+}
 /* password (soft protection, per-device) */
 function pwHash(str){let h1=0xdeadbeef,h2=0x41c6ce57;for(let i=0;i<str.length;i++){const ch=str.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677);}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return(4294967296*(2097151&h2)+(h1>>>0)).toString(36);}
 function getPwRecord(h){try{const v=localStorage.getItem('chpw_'+h);return v?JSON.parse(v):null;}catch(e){return null;}}
@@ -930,6 +942,7 @@ function showLookup(){
   const box=$('#lookupBox');
   const bans=[...new Set(S.roster.map(r=>r.ban))].sort((a,b)=>a-b);
   box.innerHTML=`
+    ${twoSchoolOn()?`<div class="field" style="margin-bottom:12px"><label>학교</label><select id="lkSchool">${schoolList().map((n,i)=>`<option value="${i}">${n}</option>`).join('')}</select></div>`:''}
     <div class="row">
       <div class="field"><label>반</label><select id="lkBan"><option value="">선택</option>${bans.map(b=>`<option>${b}</option>`).join('')}</select></div>
       <div class="field"><label>번호</label><input id="lkBeon" type="number" inputmode="numeric" placeholder="예: 12"></div>
@@ -941,9 +954,10 @@ function showLookup(){
     <div class="err hidden" id="lkErr"></div>`;
   $('#lkGo').onclick=()=>{
     const ban=parseInt($('#lkBan').value), beon=parseInt($('#lkBeon').value), name=$('#lkName').value.trim();
+    const sidx=twoSchoolOn()?(+($('#lkSchool')&&$('#lkSchool').value)||0):0;
     const err=$('#lkErr');err.classList.add('hidden');
     if(isNaN(ban)||isNaN(beon)||!name){err.textContent='반·번호·이름을 모두 입력하세요.';err.classList.remove('hidden');return;}
-    const h=hakbeon(ban,beon);const r=S.roster.find(x=>x.hakbeon===h);
+    const h=hakbeon(ban,beon,sidx);const r=S.roster.find(x=>x.hakbeon===h);
     if(!r){err.textContent='해당 정보의 참가자를 찾을 수 없습니다. 반·번호를 확인하세요.';err.classList.remove('hidden');return;}
     if(r.name.replace(/\s/g,'')!==name.replace(/\s/g,'')){err.textContent='이름이 일치하지 않습니다.';err.classList.remove('hidden');return;}
     const pw=$('#lkPw').value;
@@ -998,7 +1012,7 @@ function showDashboard(r,opts){
       <div class="av">${initials}</div>
       <div>
         <div class="nm">${r.name} ${r.nickname?`<span style="font-size:13px;color:var(--muted);font-weight:600">· "${r.nickname}"</span>`:''}</div>
-        <div class="sub">${r.ban}반 ${r.beon}번 · ${r.subject||'선택과목 미정'}</div>
+        <div class="sub">${twoSchoolOn()?schoolName(r.school||0)+' · ':''}${r.ban}반 ${r.beon}번 · ${r.subject||'선택과목 미정'}</div>
       </div>
       <div class="survbadge"><span class="b ${pp.alive?'alive':'dead'}">${pp.alive?'🏆 생존':'탈락'}</span>
         ${!pp.alive&&pp.outAt?`<div class="rdate" style="margin-top:5px">${pp.outAt}회에서 탈락</div>`:''}</div>
