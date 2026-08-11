@@ -220,10 +220,22 @@ function detectSchoolIdx(fname){
 /* password (soft protection, per-device) */
 function pwHash(str){let h1=0xdeadbeef,h2=0x41c6ce57;for(let i=0;i<str.length;i++){const ch=str.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677);}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return(4294967296*(2097151&h2)+(h1>>>0)).toString(36);}
 function getPwRecord(h){try{const v=localStorage.getItem('chpw_'+h);return v?JSON.parse(v):null;}catch(e){return null;}}
-function setPwRecord(h,pw){try{localStorage.setItem('chpw_'+h,JSON.stringify({h:pwHash(pw),ts:Date.now()}));}catch(e){}}
+function setPwRecord(h,pw,r){try{
+  // 기기 시계가 교사 초기화 시각보다 늦어도 새 비밀번호가 무효화되지 않도록 보정
+  const base=(r&&r.pwResetAt)?r.pwResetAt+1000:0;
+  localStorage.setItem('chpw_'+h,JSON.stringify({h:pwHash(pw),ts:Math.max(Date.now(),base)}));
+}catch(e){}}
+function pwbookHash(hb){ try{ return (S.pwbook&&S.pwbook[hb])||''; }catch(e){ return ''; } }
+function initialPwHash(r){
+  // 교사가 초기화한 경우 → 1234, 아니면 보호자 연락처 뒤 4자리, 등록 안 됐으면 1234
+  if(r.pwResetAt) return pwHash('1234');
+  return r.pw4h || pwbookHash(r.hakbeon) || pwHash('1234');
+}
+function hasPw4(r){ return !!(r.pw4h || pwbookHash(r.hakbeon)); }
+function initialPwLabel(r){ return (!r.pwResetAt && hasPw4(r)) ? '보호자 연락처 뒤 4자리' : '1234'; }
 function effectivePwHash(r){let rec=getPwRecord(r.hakbeon);
   if(rec&&r.pwResetAt&&rec.ts<r.pwResetAt){try{localStorage.removeItem('chpw_'+r.hakbeon);}catch(e){}rec=null;}
-  return rec?rec.h:pwHash('1234');}
+  return rec?rec.h:initialPwHash(r);}
 /* IndexedDB for round materials (problem/solution files) - admin side */
 const FDB={db:null,
   open(){return new Promise(res=>{try{if(!window.indexedDB)return res(null);
@@ -950,7 +962,7 @@ function showLookup(){
     </div>
     <div class="field" style="margin-bottom:12px"><label>비밀번호</label><input id="lkPw" type="password" inputmode="numeric" placeholder="초기 비밀번호 1234" autocomplete="off"></div>
     <button class="btn" id="lkGo" style="width:100%">내 결과 보기</button>
-    <p class="rdate" style="margin:10px 0 0;text-align:center">처음 접속이라면 비밀번호는 <b>1234</b> 입니다. 첫 로그인 시 나만의 비밀번호를 만들게 됩니다.<br>비밀번호를 잊었다면 선생님께 초기화를 요청하세요.</p>
+    <p class="rdate" style="margin:10px 0 0;text-align:center">처음 접속이라면 비밀번호는 <b>보호자 연락처 뒤 4자리</b> 입니다. (예: 010-1234-<b>5678</b> → <b>5678</b>)<br>첫 로그인 시 나만의 비밀번호를 만들게 됩니다. 잊었다면 선생님께 초기화를 요청하세요.</p>
     <div class="err hidden" id="lkErr"></div>`;
   $('#lkGo').onclick=()=>{
     const ban=parseInt($('#lkBan').value), beon=parseInt($('#lkBeon').value), name=$('#lkName').value.trim();
@@ -977,7 +989,7 @@ function showFirstPwSetup(r){
     <div class="card" style="border-top:4px solid var(--gold)">
       <h3 style="margin:0 0 4px">🔐 본인 확인 · 나만의 비밀번호 만들기</h3>
       <p class="rdate" style="margin:0 0 4px"><b>${r.ban}반 ${r.beon}번 ${r.name}</b> 님, 처음 접속하셨네요.</p>
-      <p class="hint" style="margin:0 0 16px">다른 사람이 내 성적을 보지 못하도록, 초기 비밀번호(1234) 대신 <b>나만 아는 새 비밀번호</b>를 먼저 만들어 주세요. 이 화면을 마쳐야 성적이 열립니다.</p>
+      <p class="hint" style="margin:0 0 16px">다른 사람이 내 성적을 보지 못하도록, 초기 비밀번호(${initialPwLabel(r)}) 대신 <b>나만 아는 새 비밀번호</b>를 먼저 만들어 주세요. 이 화면을 마쳐야 성적이 열립니다.</p>
       <div class="field" style="margin-bottom:10px"><label>새 비밀번호 (4자 이상)</label><input id="fpNew" type="password" autocomplete="off" placeholder="숫자·문자 가능"></div>
       <div class="field" style="margin-bottom:14px"><label>새 비밀번호 확인</label><input id="fpNew2" type="password" autocomplete="off" placeholder="한 번 더 입력"></div>
       <button class="btn" id="fpSave" style="width:100%">비밀번호 설정하고 내 성적 보기</button>
@@ -989,9 +1001,9 @@ function showFirstPwSetup(r){
   const done=()=>{
     const nw=$('#fpNew').value, nw2=$('#fpNew2').value, e=$('#fpErr'); e.classList.add('hidden');
     if(nw.length<4){e.textContent='새 비밀번호는 4자 이상이어야 합니다.';e.classList.remove('hidden');return;}
-    if(nw==='1234'){e.textContent='초기 비밀번호(1234)와 다른 것으로 정해주세요.';e.classList.remove('hidden');return;}
+    if(pwHash(nw)===initialPwHash(r)){e.textContent='초기 비밀번호와 다른 것으로 정해주세요.';e.classList.remove('hidden');return;}
     if(nw!==nw2){e.textContent='두 비밀번호가 서로 다릅니다.';e.classList.remove('hidden');return;}
-    setPwRecord(r.hakbeon,nw);
+    setPwRecord(r.hakbeon,nw,r);
     showDashboard(r);
   };
   $('#fpSave').onclick=done;
@@ -1056,7 +1068,7 @@ function showDashboard(r,opts){
         <input id="pwNew2" type="password" placeholder="새 비밀번호 확인" autocomplete="off">
         <button class="btn sm" id="pwSave">변경하기</button>
       </div>
-      <p class="rdate" style="margin:8px 0 0">비밀번호는 지금 사용 중인 이 기기(브라우저)에 저장됩니다. 다른 기기에서는 새로 설정해야 합니다.</p>
+      <p class="rdate" style="margin:8px 0 0">비밀번호는 지금 사용 중인 이 기기(브라우저)에 저장됩니다. 다른 기기에서 처음 접속하면 <b>보호자 연락처 뒤 4자리</b>로 로그인한 뒤 다시 설정하게 됩니다.</p>
       <div class="err hidden" id="pwMsg"></div>
     </div>`}
   </div>`;
@@ -1087,7 +1099,7 @@ function showDashboard(r,opts){
     if(pwHash(cur)!==effectivePwHash(r)){msg.textContent='현재 비밀번호가 올바르지 않습니다.';msg.classList.remove('hidden');return;}
     if(nw.length<4){msg.textContent='새 비밀번호는 4자 이상이어야 합니다.';msg.classList.remove('hidden');return;}
     if(nw!==nw2){msg.textContent='새 비밀번호가 서로 다릅니다.';msg.classList.remove('hidden');return;}
-    setPwRecord(r.hakbeon,nw);
+    setPwRecord(r.hakbeon,nw,r);
     $('#pwCur').value=$('#pwNew').value=$('#pwNew2').value='';
     msg.textContent='비밀번호가 변경되었습니다. 다음 접속부터 새 비밀번호를 사용하세요.';msg.style.color='var(--pass)';msg.classList.remove('hidden');
   };
