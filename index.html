@@ -982,7 +982,7 @@ function showLookup(){
 }
 function showFirstPwSetup(r){
   const app=$('#app');
-  document.querySelector('.hero').classList.add('hidden');
+  {const _h=document.querySelector('.hero'); if(_h)_h.classList.add('hidden');}
   app.className='dash';
   app.innerHTML=`
   <div class="wrap" style="max-width:440px">
@@ -1008,12 +1008,12 @@ function showFirstPwSetup(r){
   };
   $('#fpSave').onclick=done;
   $('#fpNew2').addEventListener('keydown',ev=>{if(ev.key==='Enter')done();});
-  $('#fpBack').onclick=()=>{document.querySelector('.hero').classList.remove('hidden');app.className='';app.innerHTML='';showLookup();window.scrollTo(0,0);};
+  $('#fpBack').onclick=()=>{{const _h=document.querySelector('.hero'); if(_h)_h.classList.remove('hidden');}app.className='';app.innerHTML='';showLookup();window.scrollTo(0,0);};
 }
 function showDashboard(r,opts){
   opts=opts||{};
   const c=compute();const pp=c.per[r.hakbeon];const app=$('#app');
-  document.querySelector('.hero').classList.add('hidden');
+  {const _h=document.querySelector('.hero'); if(_h)_h.classList.add('hidden');}
   app.className='dash';
   const initials=r.name.slice(0,2);
   const improveHtml=pp.improve==null?'<span style="color:var(--faint)">-</span>':`<span class="${pp.improve>0?'up':(pp.improve<0?'down':'')}">${pp.improve>0?'+':''}${pp.improve}</span>`;
@@ -1072,7 +1072,7 @@ function showDashboard(r,opts){
       <div class="err hidden" id="pwMsg"></div>
     </div>`}
   </div>`;
-  $('#backBtn').onclick=()=>{ if(opts.onBack){opts.onBack();return;} document.querySelector('.hero').classList.remove('hidden');app.className='';app.innerHTML='';showLookup();window.scrollTo(0,0);};
+  $('#backBtn').onclick=()=>{ if(opts.onBack){opts.onBack();return;} {const _h=document.querySelector('.hero'); if(_h)_h.classList.remove('hidden');}app.className='';app.innerHTML='';showLookup();window.scrollTo(0,0);};
 
   // materials (외부 링크 안내 + 첨부파일이 있으면 함께 표시)
   const ms=$('#matSec');
