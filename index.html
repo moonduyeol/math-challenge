@@ -971,7 +971,9 @@ function showLookup(){
     if(isNaN(ban)||isNaN(beon)||!name){err.textContent='반·번호·이름을 모두 입력하세요.';err.classList.remove('hidden');return;}
     const h=hakbeon(ban,beon,sidx);const r=S.roster.find(x=>x.hakbeon===h);
     if(!r){err.textContent='해당 정보의 참가자를 찾을 수 없습니다. 반·번호를 확인하세요.';err.classList.remove('hidden');return;}
-    if(r.name.replace(/\s/g,'')!==name.replace(/\s/g,'')){err.textContent='이름이 일치하지 않습니다.';err.classList.remove('hidden');return;}
+    const nameUnknown = !r.name || /^학번\s/.test(r.name);
+    if(nameUnknown){ r.name=name.trim(); }           // 자동 추가 학생: 입력한 이름으로 확정
+    else if(r.name.replace(/\s/g,'')!==name.replace(/\s/g,'')){err.textContent='이름이 일치하지 않습니다.';err.classList.remove('hidden');return;}
     const pw=$('#lkPw').value;
     if(!pw){err.textContent='비밀번호를 입력하세요. (초기 비밀번호 1234)';err.classList.remove('hidden');return;}
     if(pwHash(pw)!==effectivePwHash(r)){err.textContent='비밀번호가 올바르지 않습니다. 잊었다면 선생님께 초기화를 요청하세요.';err.classList.remove('hidden');return;}
@@ -1286,20 +1288,28 @@ function drawTrend(sec,pp){
 /* ================= BOOT (학생 실시간 조회판 · data.json 자동 로드) ================= */
 function syncAutoRoster(){
   if(!S.roster||!S.scores)return 0;
-  const known=new Set(S.roster.map(r=>r.hakbeon));
-  let added=0;
+  // 학번별로 모든 회차를 훑어 이름·과목을 최대한 확보
+  const info={};
   Object.values(S.scores).forEach(m=>{ if(!m)return; Object.keys(m).forEach(h=>{
-    const rec=m[h]||{};
+    const rec=m[h]||{}; const cur=info[h]||(info[h]={});
+    if(rec.name && !cur.name) cur.name=String(rec.name).trim();
+    if(rec.subject && !cur.subject) cur.subject=rec.subject;
+    if(rec.school!=null && cur.school==null) cur.school=rec.school;
+  });});
+  let added=0;
+  Object.keys(info).forEach(h=>{
+    const rec=info[h];
     let ex=S.roster.find(x=>x.hakbeon===h);
     if(!ex){
       const ban=parseInt(String(h).slice(-4,-2),10)||0, beon=parseInt(String(h).slice(-2),10)||0;
-      S.roster.push({hakbeon:h,ban,beon,name:rec.name||('학번 '+h),subject:rec.subject||'',nickname:'',auto:true});
-      known.add(h); added++;
+      S.roster.push({hakbeon:h,ban,beon,name:rec.name||('학번 '+h),subject:rec.subject||'',nickname:'',auto:true,school:rec.school!=null?rec.school:0});
+      added++;
     } else if(ex.auto){
       if(rec.name && (!ex.name||/^학번\s/.test(ex.name))) ex.name=rec.name;
       if(rec.subject && !ex.subject) ex.subject=rec.subject;
+      if(ex.school==null && rec.school!=null) ex.school=rec.school;
     }
-  });});
+  });
   if(added){ S.roster.sort((a,b)=>(a.ban-b.ban)||(a.beon-b.beon)); }
   return added;
 }
