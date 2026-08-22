@@ -164,8 +164,13 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .oxdetail{border:1px solid var(--line);border-top:none;border-radius:0 0 10px 10px;margin-top:-8px;padding:14px;background:var(--paper)}
 .oxgrid{display:grid;grid-template-columns:repeat(10,1fr);gap:5px}
 @media(max-width:480px){.oxgrid{grid-template-columns:repeat(6,1fr)}}
-.oxcell{border-radius:6px;text-align:center;font-size:10.5px;font-weight:700;padding:5px 0 3px;line-height:1.2}
-.oxcell span{display:block;font-size:12px}
+.oxcell{border-radius:6px;text-align:center;font-size:10.5px;font-weight:700;padding:4px 0 4px;line-height:1.25;position:relative}
+.oxcell span{display:block}
+.oxcell .qn{font-size:10px;opacity:.75}
+.oxcell .mk{font-size:12.5px;font-weight:800}
+.oxcell .ln{display:block;font-size:11px;font-weight:800;line-height:1.35}
+.oxcell .ln.ans{color:var(--navy);border-top:1px dashed rgba(0,0,0,.15);margin-top:1px;padding-top:1px}
+.oxcell.ju:after{content:'◆';position:absolute;top:1px;right:3px;font-size:7px;opacity:.55}
 .oxcell.o{background:var(--pass-soft);color:var(--pass)}
 .oxcell.x{background:var(--fail-soft);color:var(--fail)}
 .rd{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
@@ -374,13 +379,20 @@ function compute(){
       t.srank=1+sameSubj.filter(x=>x.score>t.score).length; t.sN=sameSubj.length;
     });
     const first=taken[0], last=taken[taken.length-1];
+    // 개근상(전 회차 응시) 자격: 업로드된 회차 중 '미응시'가 한 번이라도 있으면 상실
+    const uploadedRounds=rounds.filter(rd=>roundStats[rd.idx]&&roundStats[rd.idx].uploaded);
+    const missedList=uploadedRounds.filter(rd=>status[h][rd.idx]==='미응시').map(rd=>rd.idx);
     per[h]={
       taken, count:taken.length,
       alive:alive.has(h), outAt:outAt[h]||null,
       firstScore:first?first.score:null, lastScore:last?last.score:null,
       improve:(first&&last)?last.score-first.score:null,
       rankChange:(first&&last&&first.rank&&last.rank)?first.rank-last.rank:null,
-      status:status[h]
+      status:status[h],
+      uploadedCount:uploadedRounds.length,
+      missedRounds:missedList,
+      perfectAlive: missedList.length===0,          // 아직 개근 유지 중
+      perfectDone: missedList.length===0 && uploadedRounds.length===rounds.length
     };
   });
   return {alive,per,roundStats,outAt,status};
@@ -1035,6 +1047,8 @@ function showDashboard(r,opts){
     <div class="mcards">
       <div class="mc"><div class="k">응시 횟수</div><div class="v">${pp.count}<small>/${S.rounds.length}</small></div></div>
       <div class="mc"><div class="k">최근 점수</div><div class="v">${pp.lastScore==null?'-':pp.lastScore}<small>${pp.lastScore==null?'':'점'}</small></div></div>
+      <div class="mc"><div class="k">전 회차 응시</div><div class="v" style="font-size:16px;color:${pp.perfectAlive?'var(--pass)':'var(--fail)'}">${pp.perfectAlive?(pp.perfectDone?'개근 달성 🏅':'유지 중'):'기회 소멸'}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${pp.perfectAlive?`${pp.uploadedCount}회 모두 응시`:`${pp.missedRounds.join(', ')}회 미응시`}</div></div>
       <div class="mc"><div class="k">성적 향상도</div><div class="v">${improveHtml}</div></div>
       <div class="mc"><div class="k">현재 상태</div><div class="v" style="font-size:18px;padding-top:6px">${pp.alive?'<span class="up">생존 중</span>':'<span class="down">탈락</span>'}</div></div>
     </div>
@@ -1232,7 +1246,6 @@ function buildOXGrid(t,r){
   const key=keyPack&&keyPack.keys&&keyPack.keys[subj];
   const keyStr=key?key.blocks.join(''):null;   // 30-char: digits or J
   const juKey=key?key.ju:null;                  // subjective correct answers
-  // map J positions (question numbers, ascending) -> ju index
   let juMap={};
   if(keyStr){let ji=0;[...keyStr].forEach((ch,i)=>{if(ch==='J'){juMap[i]=ji++;}});}
   const n=t.ox.length;
@@ -1242,14 +1255,32 @@ function buildOXGrid(t,r){
     const ch=t.ox[i];if(ch!=='O'&&ch!=='X')continue;
     total++;if(ch==='O')right++;
     const isJu=keyStr&&keyStr[i]==='J';
-    let tip='';
+    let ansTxt='', mineTxt='';
     if(keyStr){
-      if(isJu&&juKey){const ji=juMap[i];tip=`정답 ${juKey[ji]??'-'}${t.ju&&t.ju[ji]!=null?` · 내 답 ${t.ju[ji]}`:''}`;}
-      else{tip=`정답 ${keyStr[i]}`;}
+      if(isJu&&juKey){
+        const ji=juMap[i];
+        ansTxt = juKey[ji]!=null? String(juKey[ji]) : '-';
+        mineTxt = (t.ju&&t.ju[ji]!=null)? String(t.ju[ji]) : '-';
+      } else {
+        ansTxt = keyStr[i];
+        mineTxt = (ch==='O')? keyStr[i] : '?';   // 객관식 오답은 선택지 정보가 없음
+      }
     }
-    cells+=`<div class="oxcell ${ch==='O'?'o':'x'}" title="${i+1}번 ${tip}">${i+1}<span>${ch}</span></div>`;
+    const detail = keyStr
+      ? `<b class="ln">${mineTxt}</b><b class="ln ans">${ansTxt}</b>`
+      : '';
+    cells+=`<div class="oxcell ${ch==='O'?'o':'x'}${isJu?' ju':''}">
+      <span class="qn">${i+1}</span><span class="mk">${ch}</span>${detail}</div>`;
   }
-  // subjective comparison rows (wrong ones highlighted)
+  const legend = keyStr
+    ? `<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin:8px 0 0">
+         <span><b style="color:var(--ink)">위 숫자</b> 내가 쓴 답</span>
+         <span><b style="color:var(--navy)">아래 파란 숫자</b> 정답</span>
+         <span>객관식 오답은 <b>?</b> (선택 번호 미저장)</span>
+         <span class="ju-legend">◆ 표시는 주관식</span>
+       </div>`
+    : '<p style="font-size:11px;color:var(--faint);margin:8px 0 0">정답 정보가 없는 회차입니다.</p>';
+  // 주관식 비교표
   let juTable='';
   if(juKey&&t.ju){
     const rows=Object.entries(juMap).map(([qi,ji])=>{
@@ -1264,7 +1295,8 @@ function buildOXGrid(t,r){
       <span style="font-size:12.5px;font-weight:700;color:var(--muted)">문항별 채점 결과</span>
       <span style="font-size:12px;color:var(--muted)">맞은 문항 <b>${right}</b>/${total}</span></div>
     <div class="oxgrid">${cells}</div>
-    <p style="font-size:11px;color:var(--faint);margin:8px 0 0">1~22번 공통 · 23~30번 ${subj||'선택'} · 문항을 길게 누르면 정답 확인</p>
+    ${legend}
+    <p style="font-size:11px;color:var(--faint);margin:6px 0 0">1~22번 공통 · 23~30번 ${subj||'선택'}</p>
     ${juTable}`;
 }
 function drawTrend(sec,pp){
